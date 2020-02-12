@@ -1,0 +1,22 @@
+{
+	"server": {
+		"port": 7331
+	},
+	"db": {
+		"server": "sqlite",
+		"sqlitepath": "./sqlite/db"
+	},
+	"tmpPath": "./tmp/",
+	"defaultPath": "./files/",
+
+	"storagePaths": [
+		{
+			"path": "./files/content/",
+			"modelName": "content"
+		},
+		{
+			"path": "./files/pack/",
+			"modelName": "packaging"
+		}
+	]
+}

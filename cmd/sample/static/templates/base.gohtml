@@ -1,0 +1,115 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link href="https://unpkg.com/filepond/dist/filepond.css" rel="stylesheet">
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.8.0/css/bulma.min.css">
+    <script defer src="https://use.fontawesome.com/releases/v5.3.1/js/all.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+</head>
+
+<body>
+    
+    <section class="section" style="min-height: 600px;">
+        <div class="container">
+            
+            {{template "content" .}}
+            
+        </div>
+    </section>
+
+    <footer class="footer">
+        <div class="content">
+            <p><strong>wk.pcl</strong> wersja -</p>
+        </div>
+    </footer>
+
+    <script type="text/javascript" src="https://unpkg.com/filepond/dist/filepond.js"></script>
+    
+    <script type="text/javascript">
+        $(document).ready(function() {
+
+            // Check for click events on the navbar burger icon
+            $(".navbar-burger").click(function() {
+
+                // Toggle the "is-active" class on both the "navbar-burger" and the "navbar-menu"
+                $(".navbar-burger").toggleClass("is-active");
+                $(".navbar-menu").toggleClass("is-active");
+
+            });
+        });
+
+    </script>
+
+    {{template "script" .}}
+
+    <script type="text/javascript">
+
+    const inputElement = document.querySelector('input#filepond-input[type="file"]');
+    if (inputElement != null) {
+        const pond = FilePond.create( inputElement, {
+            server: '/file/upload',
+            labelIdle: 'Przeciągnij pliki tutaj lub <span class="filepond--label-action"> kliknij </span>',
+            maxFiles: 10,
+            allowMultiple: true
+        }); 
+    }
+    
+    $('.action-filter').keypress(
+        function(event){
+            if (event.which == '13') {
+                event.preventDefault();
+                $(this).change();
+            }
+
+    });
+
+    
+    $('.action-filter').change(function() {
+        
+        const target = $('#' + $(this).attr('data-action-filter'))
+
+        if (target.length != 1)
+            return false
+
+        const phrase = $(this)[0].value.toLowerCase();
+
+        
+        // console.log(target);
+
+        target.find('option').each(function(i, element) {
+            
+            if (element.text.toLowerCase().search(phrase) < 0) {
+                
+                $(element).prop('selected', false);
+                $(element).hide();
+            
+            } else {
+                // element.prop('selected', true);
+                $(element).show();
+
+            }
+                
+                
+        });
+
+        
+    });
+
+    $('.action-show-toggle').click(function() {
+        const target = $('#' + $(this).attr('data-action-target'));
+        target.toggle();
+    });
+
+    </script>
+    
+</body>
+
+</html>

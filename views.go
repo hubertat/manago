@@ -129,8 +129,12 @@ func (vs *ViewSet) GetT(name string) *template.Template {
 		return t
 	} else {
 		log.Print("template not present in the ts map, using default")
-
-		return vs.ts["default"]
+		tDef, present := vs.ts["default"]
+		if !present {
+			log.Fatal("ViewSet GetT: default template not found! Did you add 'default.html'?")
+			return nil
+		}
+		return tDef
 	}
 
 }

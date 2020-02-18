@@ -306,44 +306,46 @@ func (ctr *Controller) LookForFileponds(model interface{}, params ...string) (fP
 		var cnt int
 
 		for _, onePond := range ctr.Req.FormSlice("filepond") {
-			file = &models.File{}
-			fId = &FileId{}
-			cnt = 0
-			err = json.Unmarshal([]byte(onePond), fId)
-			if err != nil {
-				err = fmt.Errorf("BaseController LookForFileponds: decoding file id error: %w", err)
-				return
-			}
-			ctr.Db.First(file, fId.Id).Count(&cnt)
-			if cnt == 0 {
-				err = fmt.Errorf("BaseController LookForFileponds: file (%d) not found", fId.Id)
-				return
-			}
-			if !file.IsTemp {
-				err = fmt.Errorf("BaseController LookForFileponds: file (%d) is not TempFile!", fId.Id)
-				return
-			}
-			ctr.Db.Model(model).Association("Files").Append(file)
+			if len(onePond) > 1 {
+				file = &models.File{}
+				fId = &FileId{}
+				cnt = 0
+				err = json.Unmarshal([]byte(onePond), fId)
+				if err != nil {
+					err = fmt.Errorf("BaseController LookForFileponds: decoding file id error: %w", err)
+					return
+				}
+				ctr.Db.First(file, fId.Id).Count(&cnt)
+				if cnt == 0 {
+					err = fmt.Errorf("BaseController LookForFileponds: file (%d) not found", fId.Id)
+					return
+				}
+				if !file.IsTemp {
+					err = fmt.Errorf("BaseController LookForFileponds: file (%d) is not TempFile!", fId.Id)
+					return
+				}
+				ctr.Db.Model(model).Association("Files").Append(file)
 
-			storagePath, err := ctr.Man.Config.GetStoragePath(pathName)
-			if err != nil {
-				err = fmt.Errorf("BaseController LookForFileponds: storage path error: %w", err)
-				return fParsed, err
-			}
-			if nestedPath {
-				err = file.MoveTemp(storagePath, subPath)
-			} else {
-				err = file.MoveTemp(storagePath)
-			}
+				storagePath, err := ctr.Man.Config.GetStoragePath(pathName)
+				if err != nil {
+					err = fmt.Errorf("BaseController LookForFileponds: storage path error: %w", err)
+					return fParsed, err
+				}
+				if nestedPath {
+					err = file.MoveTemp(storagePath, subPath)
+				} else {
+					err = file.MoveTemp(storagePath)
+				}
 
-			ctr.Db.Save(file)
+				ctr.Db.Save(file)
 
-			if err != nil {
-				err = fmt.Errorf("BaseController LookForFileponds: moving TempFile error: %w", err)
-				return fParsed, err
+				if err != nil {
+					err = fmt.Errorf("BaseController LookForFileponds: moving TempFile error: %w", err)
+					return fParsed, err
+				}
+				fParsed++
+
 			}
-			fParsed++
-
 		}
 	}
 	return

@@ -34,6 +34,11 @@ type Controlled interface {
 	SetRedir(string)
 }
 
+type File interface {
+	IsTemporary()				bool
+	MoveTemp(...string)			error
+}
+
 type Auth struct {
 	IsIn     bool
 	Username string
@@ -275,14 +280,19 @@ func (ctr *Controller) FirstPreload(model interface{}, modelId uint, preload ...
 	return
 }
 
-func (ctr *Controller) LookForFileponds(model interface{}, params ...string) (fParsed int, err error) {
+func (ctr *Controller) LookForFileponds(model interface{}, file File, params ...string) (fParsed int, err error) {
 	type FileId struct {
 		Id uint
 	}
 
+	kindF := reflect.ValueOf(file).Type().Kind().String()
+	if kindF != "ptr" {
+		err = fmt.Errorf("Expected file as pointer! Received non-pointer type.")
+		return
+	}
 	kind := reflect.ValueOf(model).Type().Kind().String()
 	if kind != "ptr" {
-		err = fmt.Errorf("Expected pointer input! Received non-pointer type.")
+		err = fmt.Errorf("Expected pointer model input! Received non-pointer type.")
 		return
 	}
 	modelName := reflect.Indirect(reflect.ValueOf(model)).Type().Name()
@@ -300,53 +310,50 @@ func (ctr *Controller) LookForFileponds(model interface{}, params ...string) (fP
 
 	}
 
-	if ctr.Req.FormCheckSingle("filepond") {
-		var file *models.File
-		var fId *FileId
-		var cnt int
+	var fId *FileId
+	var cnt int
 
-		for _, onePond := range ctr.Req.FormSlice("filepond") {
-			if len(onePond) > 1 {
-				file = &models.File{}
-				fId = &FileId{}
-				cnt = 0
-				err = json.Unmarshal([]byte(onePond), fId)
-				if err != nil {
-					err = fmt.Errorf("BaseController LookForFileponds: decoding file id error: %w", err)
-					return
-				}
-				ctr.Db.First(file, fId.Id).Count(&cnt)
-				if cnt == 0 {
-					err = fmt.Errorf("BaseController LookForFileponds: file (%d) not found", fId.Id)
-					return
-				}
-				if !file.IsTemp {
-					err = fmt.Errorf("BaseController LookForFileponds: file (%d) is not TempFile!", fId.Id)
-					return
-				}
-				ctr.Db.Model(model).Association("Files").Append(file)
-
-				storagePath, err := ctr.Man.Config.GetStoragePath(pathName)
-				if err != nil {
-					err = fmt.Errorf("BaseController LookForFileponds: storage path error: %w", err)
-					return fParsed, err
-				}
-				if nestedPath {
-					err = file.MoveTemp(storagePath, subPath)
-				} else {
-					err = file.MoveTemp(storagePath)
-				}
-
-				ctr.Db.Save(file)
-
-				if err != nil {
-					err = fmt.Errorf("BaseController LookForFileponds: moving TempFile error: %w", err)
-					return fParsed, err
-				}
-				fParsed++
-
+	for _, onePond := range ctr.Req.FormSlice("filepond") {
+		if len(onePond) > 0 {
+			fId = &FileId{}
+			cnt = 0
+			err = json.Unmarshal([]byte(onePond), fId)
+			if err != nil {
+				err = fmt.Errorf("BaseController LookForFileponds: decoding file id error: %w", err)
+				return
 			}
+			ctr.Db.First(file, fId.Id).Count(&cnt)
+			if cnt == 0 {
+				err = fmt.Errorf("BaseController LookForFileponds: file (%d) not found", fId.Id)
+				return
+			}
+			if !file.IsTemporary() {
+				err = fmt.Errorf("BaseController LookForFileponds: file (%d) is not TempFile!", fId.Id)
+				return
+			}
+			ctr.Db.Model(model).Association("Files").Append(file)
+
+			storagePath, err := ctr.Man.Config.GetStoragePath(pathName)
+			if err != nil {
+				err = fmt.Errorf("BaseController LookForFileponds: storage path error: %w", err)
+				return fParsed, err
+			}
+			if nestedPath {
+				err = file.MoveTemp(storagePath, subPath)
+			} else {
+				err = file.MoveTemp(storagePath)
+			}
+
+			ctr.Db.Save(file)
+
+			if err != nil {
+				err = fmt.Errorf("BaseController LookForFileponds: moving TempFile error: %w", err)
+				return fParsed, err
+			}
+			fParsed++
+
 		}
 	}
+	
 	return
 }

@@ -14,8 +14,6 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/julienschmidt/httprouter"
 
-	// "gowk/views"
-	"gowk/models"
 )
 
 type Controlled interface {
@@ -39,10 +37,10 @@ type File interface {
 	MoveTemp(...string)			error
 }
 
+
 type Auth struct {
 	IsIn     bool
 	Username string
-	User     *models.User
 }
 
 type StatusError struct {
@@ -132,10 +130,9 @@ func (ctr *Controller) StartSession(s *session.Manager, w http.ResponseWriter, r
 	case string:
 		ctr.Auth.IsIn = true
 		ctr.Auth.Username = auth
-		ctr.Auth.User = &models.User{}
-		ctr.Db.Where("id = ?", auth).First(ctr.Auth.User)
-		ctr.Req.SetCt("Auth", ctr.Auth)
 	}
+
+	ctr.Req.SetCtQuick(ctr.Auth)
 	return nil
 }
 
@@ -356,4 +353,38 @@ func (ctr *Controller) LookForFileponds(model interface{}, file File, params ...
 	}
 	
 	return
+}
+
+func (ctr *Controller) AuthGetUser(model interface{}) error {
+	if !ctr.Auth.IsIn {
+		return fmt.Errorf("Controller AuthGetUser: no user logged in!")
+	}
+
+	kind := reflect.ValueOf(model).Type().Kind().String()
+	if kind != "ptr" {
+		return fmt.Errorf("Controller AuthGetUser: Expected pointer model input! Received non-pointer type.")
+	}
+
+	preloadErr := ctr.Db.Where("id = ?", ctr.Auth.Username).First(model).Error
+	if preloadErr != nil {
+		return fmt.Errorf("Controller AuthGetUser getting user (%s) failed: \n%v", ctr.Auth.Username, preloadErr)
+	}
+
+	return nil 	
+}
+
+// AuthAttachUser tries to find logged in user and load it to user pointing struct
+// if succeed it attaching provided model to user struct
+func (ctr *Controller) AuthAttachUser(user interface{}, model interface{}) error {
+	kind := reflect.ValueOf(model).Type().Kind().String()
+	if kind != "ptr" {
+		return fmt.Errorf("Controller AuthAttachUser: Expected pointer model input! Received non-pointer type.")
+	}
+
+	err := ctr.AuthGetUser(user)
+	if err != nil {
+		return fmt.Errorf("Controller AuthAttachUser: getting user failed:\n%v", err)
+	}
+
+	return ctr.Db.Model(model).Association("User").Append(user).Error
 }

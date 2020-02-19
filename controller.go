@@ -24,10 +24,12 @@ type Controlled interface {
 	SessionRelease(http.ResponseWriter)
 	IsError() bool
 	GetError() StatusError
+	SetError(int, error, ...string)
 	SetManager(*Manager)
 	SetRouter(*httprouter.Router)
 	SetReqData(*http.Request, httprouter.Params)
 	Ctnt() *map[string]interface{}
+	JsonCtnt() ([]byte, error)
 	GetRedir() (bool, string)
 	SetRedir(string)
 }
@@ -74,6 +76,10 @@ func (ctr *Controller) Ctnt() *map[string]interface{} {
 	return ctr.Req.Ctnt()
 }
 
+func (ctr *Controller) JsonCtnt() ([]byte, error) {
+	return json.Marshal(ctr.Ctnt())
+}
+
 func (ctr *Controller) SetCt(name string, val interface{}) {
 	ctr.Req.SetCt(name, val)
 }
@@ -84,6 +90,10 @@ func (ctr *Controller) GetRedir() (bool, string) {
 
 func (ctr *Controller) SetRedir(input string) {
 	ctr.Req.SetRedir(input)
+}
+
+func (ctr *Controller) HandleJson(mtdName string) httprouter.Handle {
+	return ctr.Man.HandleJson(ctr.Name, mtdName)
 }
 
 func (ctr *Controller) Handle(options ...string) httprouter.Handle {

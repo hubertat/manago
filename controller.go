@@ -68,6 +68,10 @@ type Controller struct {
 	Man *Manager
 }
 
+func (ctr *Controller) GetPaginator() *Paginator {
+	return NewPaginator(ctr.Man)
+}
+
 func (ctr *Controller) SetReqData(r *http.Request, ps httprouter.Params) {
 	ctr.Req.SetData(r, ps)
 }

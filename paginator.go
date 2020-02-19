@@ -34,8 +34,6 @@ func (pag *Paginator) FindModel(modelSlice interface{}, query interface{}) error
 	}
 
 	count := 0
-	fmt.Printf("\nPaginator FindModel debug:\n\noffset:\t%d\nlimit:\t%d\n\n", pag.getOffset(), pag.getLimit())
-
 	pag.manager.Dbc.DB.Where(query).Find(modelSlice).Count(&count)
 	
 	err := pag.manager.Dbc.DB.Where(query).Limit(pag.getLimit()).Offset(pag.getOffset()).Find(modelSlice).Error

@@ -69,7 +69,7 @@ type Controller struct {
 }
 
 func (ctr *Controller) GetPaginator() *Paginator {
-	return NewPaginator(ctr.Man)
+	return NewPaginator(ctr)
 }
 
 func (ctr *Controller) SetReqData(r *http.Request, ps httprouter.Params) {

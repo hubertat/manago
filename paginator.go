@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"github.com/jinzhu/gorm"
 )
 
 type Paginator struct {
@@ -16,26 +17,42 @@ type Paginator struct {
 	IsLastPage		bool
 
 
-	manager			*Manager
+	controller			*Controller
 }
 
-func NewPaginator(man *Manager) (pag *Paginator) {
+func NewPaginator(ctr *Controller) (pag *Paginator) {
 	pag = &Paginator{
 		Limit: 15,
-		manager: man,
+		controller: ctr,
+		CurrentPage: ctr.Req.ParamIntByName("page"),
 	}
 
 	return
 }
 
-func (pag *Paginator) QueryInFields(modelSlice interface{}, query string, fields ...string) error {
+func (pag *Paginator) RunTransaction(modelSlice interface{}, db *gorm.DB) error {
 	kind := reflect.ValueOf(modelSlice).Type().Kind().String()
 	if kind != "ptr" {
-		return fmt.Errorf("Paginator QueryInFields: Expected pointer to modele slice! Received non-pointer type.")
+		return fmt.Errorf("Paginator RunTransaction: Expected pointer to modele slice! Received non-pointer type.")
 	}
 
 	count := 0
-	tx := pag.manager.Dbc.DB
+	
+	db.Find(modelSlice).Count(&count)
+	
+	err := db.Limit(pag.getLimit()).Offset(pag.getOffset()).Find(modelSlice).Error
+	if err != nil {
+		return fmt.Errorf("Paginator RunTransaction: gorm DB.Find error:\n%v", err)
+	}
+
+	pag.updateCount(count)
+
+	return nil
+}
+
+func (pag *Paginator) QueryInFields(modelSlice interface{}, query string, fields ...string) error {
+
+	tx := pag.controller.Man.Dbc.DB
 	for ix, field := range fields {
 		if ix == 0 {
 			tx = tx.Where(fmt.Sprintf("LOWER(%s) LIKE ?", field), "%" + strings.ToLower(query) + "%")	
@@ -44,35 +61,13 @@ func (pag *Paginator) QueryInFields(modelSlice interface{}, query string, fields
 		}
 	}
 	
-	tx.Find(modelSlice).Count(&count)
-	
-	err := tx.Limit(pag.getLimit()).Offset(pag.getOffset()).Find(modelSlice).Error
-	if err != nil {
-		return fmt.Errorf("Paginator QueryInFields: gorm DB.Find error:\n%v", err)
-	}
 
-	pag.updateCount(count)
-
-	return nil
+	return pag.RunTransaction(modelSlice, tx)
 }
 
 func (pag *Paginator) FindModel(modelSlice interface{}, query interface{}) error {
-	kind := reflect.ValueOf(modelSlice).Type().Kind().String()
-	if kind != "ptr" {
-		return fmt.Errorf("Paginator FindModel: Expected pointer to modele slice! Received non-pointer type.")
-	}
 
-	count := 0
-	pag.manager.Dbc.DB.Where(query).Find(modelSlice).Count(&count)
-	
-	err := pag.manager.Dbc.DB.Where(query).Limit(pag.getLimit()).Offset(pag.getOffset()).Find(modelSlice).Error
-	if err != nil {
-		return fmt.Errorf("Paginator FindModel: gorm DB.Find error:\n%v", err)
-	}
-
-	pag.updateCount(count)
-
-	return nil
+	return pag.RunTransaction(modelSlice, pag.controller.Man.Dbc.DB.Where(query))
 }
 
 func (pag *Paginator) updateCount(count int) {
@@ -109,3 +104,22 @@ func (pag *Paginator) SetPage(page int) {
 func (pag *Paginator) SetLimit(limit int) {
 	pag.Limit = limit
 }
+
+func (pag *Paginator) GetNextPageNumber() int {
+
+	if pag.IsLastPage {
+		return pag.CurrentPage
+	}
+
+	return pag.CurrentPage + 1
+}
+
+func (pag *Paginator) GetPrevPageNumber() int {
+
+	if pag.IsFirstPage {
+		return pag.CurrentPage
+	}
+
+	return pag.CurrentPage - 1
+}
+

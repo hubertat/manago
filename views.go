@@ -116,6 +116,7 @@ func (vs *ViewSet) parseFolder(dir string, fileExtension string, sT *template.Te
 			"tSimple": tTime,
 			"tDate":   tDate,
 			"sLimit":  tLimitString,
+			"tFindInput":  tFindInput,
 		}).ParseFiles(filesToParse...)
 	} else {
 		return sT.ParseFiles(filesToParse...)
@@ -172,4 +173,24 @@ func tLimitString(s string) string {
 		return s[:16] + "..."
 	}
 	return s
+}
+
+func tFindInput(s ...string) (output map[string]string) {
+	output = make(map[string]string)
+
+	if len(s) < 3 {
+		return 
+	}
+	
+	output["Title"] = s[0]
+	output["ModelName"] = s[1]
+	output["FindPost"] = s[2]
+	
+	if len(s) < 4 {
+		return 
+	}
+
+	output["FindFields"] = s[3]
+
+	return
 }

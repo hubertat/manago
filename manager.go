@@ -72,12 +72,13 @@ func New(conf Config, allCtrs []interface{}, allModels []interface{}) (man *Mana
 	err = man.Views.Load(&conf)
 	if err != nil {
 		err = fmt.Errorf("ERROR Manager New: views set failed: %w", err)
+		return
 	}
 
 
 	err = man.Dbc.Check(man.Config.Db)
 	if err != nil {
-		log.Panicf("ERROR Manager New: Database check error:\n%v", err)
+		err = fmt.Errorf("ERROR Manager New: Database check error:\n%v", err)
 	}
 
 	return

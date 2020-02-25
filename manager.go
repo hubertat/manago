@@ -72,12 +72,13 @@ func New(conf Config, allCtrs []interface{}, allModels []interface{}) (man *Mana
 	err = man.Views.Load(&conf)
 	if err != nil {
 		err = fmt.Errorf("ERROR Manager New: views set failed: %w", err)
+		return
 	}
 
 
 	err = man.Dbc.Check(man.Config.Db)
 	if err != nil {
-		log.Panicf("ERROR Manager New: Database check error:\n%v", err)
+		err = fmt.Errorf("ERROR Manager New: Database check error:\n%v", err)
 	}
 
 	return
@@ -108,6 +109,65 @@ func (man *Manager) MakeRoutes() {
 		ctr.SetManager(man)
 		ctr.SetRouter(man.router)
 		ctr.SetRoutes()
+	}
+}
+
+func (man *Manager) HandleJson(ctrName, mtdName string) httprouter.Handle {
+
+	log.Printf("Manager HandleJson: preparing: %s->%s", ctrName, mtdName)
+
+	typ, isOk := man.controllersReflected[ctrName]
+	if !isOk {
+		log.Fatalf("Manager HandleJson: controller [%s] not found!", ctrName)
+	}
+
+	if !reflect.New(typ).MethodByName(mtdName).IsValid() {
+		log.Fatalf("Manager HandleJson: method[%v] not found!", mtdName)
+	}
+
+	return func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+
+		ctr := reflect.New(typ).Interface().(Controlled)
+		method := reflect.ValueOf(ctr).MethodByName(mtdName)
+
+		log.Printf("%T HandleJson: method[%v]", ctr, mtdName)
+	
+		ctr.SetReqData(r, ps)
+		ctr.SetManager(man)
+
+		dbh, err := ctr.SetupDB(man.Dbc)
+		if err != nil {
+			log.Print(err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer dbh.Close()
+
+		err = ctr.StartSession(man.sessionManager, w, r)
+		defer ctr.SessionRelease(w)
+		if err != nil {
+			log.Print(err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		method.Call([]reflect.Value{})
+
+		json, errJson := ctr.JsonCtnt()
+		if errJson != nil {
+			ctr.SetError(500, fmt.Errorf("HandleJson parsing to json failed:\n%v", errJson))
+		}
+
+		if ctr.IsError() {
+			log.Print("Error from controller detected, serving:")
+			log.Print(ctr.GetError().Msg)
+			log.Print(ctr.GetError().Err)
+			http.Error(w, ctr.GetError().Msg, ctr.GetError().Code)
+		} else {
+			w.Header().Set("Content-Type", "application/json")
+  			w.Write(json)		
+		}
+
 	}
 }
 
@@ -150,11 +210,7 @@ func (man *Manager) Handle(params ...string) httprouter.Handle {
 	if !isOk {
 		log.Fatalf("Manager Handle: controller [%s] not found!", ctrName)
 	}
-	// if reflect.New(typ).IsZero() {
-	// 	log.Fatalf("Manager Handle: controller[%v] is zero!", ctrName)
-	// }
-	// log.Printf("%+v\n", typ)
-	// log.Printf("%+v\n", reflect.New(typ))
+
 	if !reflect.New(typ).MethodByName(mtdName).IsValid() {
 		log.Fatalf("Manager Handle: method[%v] not found! (template: %v)", mtdName, tmplName)
 	}

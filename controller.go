@@ -24,10 +24,12 @@ type Controlled interface {
 	SessionRelease(http.ResponseWriter)
 	IsError() bool
 	GetError() StatusError
+	SetError(int, error, ...string)
 	SetManager(*Manager)
 	SetRouter(*httprouter.Router)
 	SetReqData(*http.Request, httprouter.Params)
 	Ctnt() *map[string]interface{}
+	JsonCtnt() ([]byte, error)
 	GetRedir() (bool, string)
 	SetRedir(string)
 }
@@ -35,6 +37,7 @@ type Controlled interface {
 type File interface {
 	IsTemporary()				bool
 	MoveTemp(...string)			error
+	Reset()
 }
 
 
@@ -66,12 +69,20 @@ type Controller struct {
 	Man *Manager
 }
 
+func (ctr *Controller) GetPaginator() *Paginator {
+	return NewPaginator(ctr)
+}
+
 func (ctr *Controller) SetReqData(r *http.Request, ps httprouter.Params) {
 	ctr.Req.SetData(r, ps)
 }
 
 func (ctr *Controller) Ctnt() *map[string]interface{} {
 	return ctr.Req.Ctnt()
+}
+
+func (ctr *Controller) JsonCtnt() ([]byte, error) {
+	return json.Marshal(ctr.Ctnt())
 }
 
 func (ctr *Controller) SetCt(name string, val interface{}) {
@@ -84,6 +95,10 @@ func (ctr *Controller) GetRedir() (bool, string) {
 
 func (ctr *Controller) SetRedir(input string) {
 	ctr.Req.SetRedir(input)
+}
+
+func (ctr *Controller) HandleJson(mtdName string) httprouter.Handle {
+	return ctr.Man.HandleJson(ctr.Name, mtdName)
 }
 
 func (ctr *Controller) Handle(options ...string) httprouter.Handle {
@@ -277,16 +292,17 @@ func (ctr *Controller) FirstPreload(model interface{}, modelId uint, preload ...
 	return
 }
 
-func (ctr *Controller) LookForFileponds(model interface{}, file File, params ...string) (fParsed int, err error) {
+func (ctr *Controller) LookForFileponds(model interface{}, fileIn File, params ...string) (fParsed int, err error) {
 	type FileId struct {
 		Id uint
 	}
 
-	kindF := reflect.ValueOf(file).Type().Kind().String()
+	kindF := reflect.ValueOf(fileIn).Type().Kind().String()
 	if kindF != "ptr" {
 		err = fmt.Errorf("Expected file as pointer! Received non-pointer type.")
 		return
 	}
+	// fType := reflect.Indirect(reflect.ValueOf(file)).Type()
 	kind := reflect.ValueOf(model).Type().Kind().String()
 	if kind != "ptr" {
 		err = fmt.Errorf("Expected pointer model input! Received non-pointer type.")
@@ -319,6 +335,7 @@ func (ctr *Controller) LookForFileponds(model interface{}, file File, params ...
 				err = fmt.Errorf("BaseController LookForFileponds: decoding file id error: %w", err)
 				return
 			}
+			file := fileIn
 			ctr.Db.First(file, fId.Id).Count(&cnt)
 			if cnt == 0 {
 				err = fmt.Errorf("BaseController LookForFileponds: file (%d) not found", fId.Id)
@@ -342,13 +359,14 @@ func (ctr *Controller) LookForFileponds(model interface{}, file File, params ...
 			}
 
 			ctr.Db.Save(file)
+			file.Reset()
 
 			if err != nil {
 				err = fmt.Errorf("BaseController LookForFileponds: moving TempFile error: %w", err)
 				return fParsed, err
 			}
 			fParsed++
-
+			
 		}
 	}
 	

@@ -391,18 +391,25 @@ func (ctr *Controller) AuthGetUser(model interface{}) error {
 	return nil 	
 }
 
-// AuthAttachUser tries to find logged in user and load it to user pointing struct
+// AppendAuthUser tries to find logged in user and load it to user pointing struct
 // if succeed it attaching provided model to user struct
-func (ctr *Controller) AuthAttachUser(user interface{}, model interface{}) error {
+func (ctr *Controller) AppendAuthUser(user interface{}, model interface{}, fieldName ...string) error {
 	kind := reflect.ValueOf(model).Type().Kind().String()
 	if kind != "ptr" {
-		return fmt.Errorf("Controller AuthAttachUser: Expected pointer model input! Received non-pointer type.")
+		return fmt.Errorf("Controller AppendAuthUser: Expected pointer model input! Received non-pointer type.")
 	}
 
 	err := ctr.AuthGetUser(user)
 	if err != nil {
-		return fmt.Errorf("Controller AuthAttachUser: getting user failed:\n%v", err)
+		return fmt.Errorf("Controller AppendAuthUser: getting user failed:\n%v", err)
 	}
 
-	return ctr.Db.Model(model).Association("User").Append(user).Error
+	var field string
+	if len(fieldName) == 1 {
+		field = fieldName[0]
+	} else {
+		field = "User"
+	}
+
+	return ctr.Db.Model(model).Association(field).Append(user).Error
 }

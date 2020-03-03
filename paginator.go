@@ -66,8 +66,12 @@ func (pag *Paginator) QueryInFields(modelSlice interface{}, query string, fields
 }
 
 func (pag *Paginator) FindModel(modelSlice interface{}, query interface{}) error {
-
 	return pag.RunTransaction(modelSlice, pag.controller.Man.Dbc.DB.Where(query))
+}
+
+func (pag *Paginator) HasRelation(modelSlice interface{}, relationName string) error {
+	tx := pag.controller.Man.Dbc.DB.Where(strings.ToLower(relationName) + "_id > 0")
+	return pag.RunTransaction(modelSlice, tx)
 }
 
 func (pag *Paginator) updateCount(count int) {

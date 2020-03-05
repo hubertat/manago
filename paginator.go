@@ -40,7 +40,7 @@ func (pag *Paginator) RunTransaction(modelSlice interface{}, db *gorm.DB) error 
 	
 	db.Find(modelSlice).Count(&count)
 	
-	err := db.Limit(pag.getLimit()).Offset(pag.getOffset()).Find(modelSlice).Error
+	err := db.Limit(pag.getLimit()).Offset(pag.getOffset()).Order("id").Find(modelSlice).Error
 	if err != nil {
 		return fmt.Errorf("Paginator RunTransaction: gorm DB.Find error:\n%v", err)
 	}

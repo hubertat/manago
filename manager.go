@@ -12,15 +12,17 @@ import (
 )
 
 type Manager struct {
-	sessionManager *session.Manager
-	router         *httprouter.Router
+	sessionManager 	*session.Manager
+	router         	*httprouter.Router
+	
 
 	controllersReflected map[string]reflect.Type
 	modelsReflected      map[string]reflect.Type
 
-	Config Config
-	Views  *ViewSet
-	Dbc    *Db
+	Config 	Config
+	Views  	*ViewSet
+	Dbc    	*Db
+	Mid		*MiddlewareManager
 }
 
 func New(conf Config, allCtrs []interface{}, allModels []interface{}) (man *Manager, err error) {
@@ -67,7 +69,9 @@ func New(conf Config, allCtrs []interface{}, allModels []interface{}) (man *Mana
 		return
 	}
 
+	man.Mid = NewMiddlewareManager()
 	man.MakeRoutes()
+	man.PrepareMiddlewares()
 
 	err = man.Views.Load(&conf)
 	if err != nil {
@@ -109,6 +113,16 @@ func (man *Manager) MakeRoutes() {
 		ctr.SetManager(man)
 		ctr.SetRouter(man.router)
 		ctr.SetRoutes()
+	}
+}
+
+func (man *Manager) PrepareMiddlewares() {
+
+	for _, typ := range man.controllersReflected {
+		log.Printf("Manager PrepareMiddleware: preparing middleware for %s", typ.Name())
+		ctr := reflect.New(typ).Interface().(Controlled)
+		ctr.SetManager(man)
+		ctr.PrepareMiddlewares()
 	}
 }
 
@@ -248,7 +262,9 @@ func (man *Manager) Handle(params ...string) httprouter.Handle {
 			ctr.SetRedir(redirAddr)
 		}
 
-		method.Call([]reflect.Value{})
+		if man.Mid.ctrRunBefore(ctrName, mtdName, ctr) {
+			method.Call([]reflect.Value{})	
+		}
 
 		if ctr.IsError() {
 			log.Print("Error from controller detected, serving:")

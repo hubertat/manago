@@ -18,6 +18,11 @@ import (
 
 type Controlled interface {
 	SetRoutes()
+	PrepareMiddlewares()
+	GetMiddleware(Middleware, ...string) *MidMethodSet
+	SetMiddleware(*MidMethodSet, ...string) error
+	SetMiddlewareDirect(Middleware, ...string) error
+	SetMiddlewareParams(Middleware, map[string]string, ...string) error
 	Handle(...string) httprouter.Handle
 	SetupDB(*Db) (*gorm.DB, error)
 	StartSession(*session.Manager, http.ResponseWriter, *http.Request) error
@@ -32,6 +37,9 @@ type Controlled interface {
 	JsonCtnt() ([]byte, error)
 	GetRedir() (bool, string)
 	SetRedir(string)
+	AuthGetUser(interface{}, ...string) error
+	FirstPreload(interface{}, uint, ...string) error
+	GetModel(interface{}, ...string) error
 }
 
 type File interface {
@@ -69,6 +77,8 @@ type Controller struct {
 	Man *Manager
 }
 
+func (ctr *Controller) SetRoutes()  {}
+func (ctr *Controller) PrepareMiddlewares()  {}
 func (ctr *Controller) GetPaginator() *Paginator {
 	return NewPaginator(ctr)
 }
@@ -105,6 +115,22 @@ func (ctr *Controller) Handle(options ...string) httprouter.Handle {
 
 	options = append([]string{ctr.Name}, options...)
 	return ctr.Man.Handle(options...)
+}
+
+
+func (ctr *Controller) GetMiddleware(middleware Middleware, params ...string) *MidMethodSet {
+	return ctr.Man.Mid.GetSet(middleware, params...)
+}
+func (ctr *Controller) SetMiddleware(mms *MidMethodSet, methods ...string) error {
+	return ctr.Man.Mid.ControllerSet(ctr.Name, mms, methods...)
+}
+func (ctr *Controller) SetMiddlewareParams(mid Middleware, params map[string]string, methods ...string) error {
+	return ctr.Man.Mid.ControllerSetRaw(ctr.Name, mid, params, methods...)
+}
+
+func (ctr *Controller) SetMiddlewareDirect(mid Middleware, methods ...string) error {
+	params := make(map[string]string)
+	return ctr.Man.Mid.ControllerSetRaw(ctr.Name, mid, params, methods...)
 }
 
 // func (ctr *Controller) File(options  ...string) httprouter.Handle {
@@ -374,7 +400,7 @@ func (ctr *Controller) LookForFileponds(model interface{}, file File, params ...
 	return
 }
 
-func (ctr *Controller) AuthGetUser(model interface{}) error {
+func (ctr *Controller) AuthGetUser(model interface{}, preload ...string) error {
 	if !ctr.Auth.IsIn {
 		return fmt.Errorf("Controller AuthGetUser: no user logged in!")
 	}
@@ -384,7 +410,12 @@ func (ctr *Controller) AuthGetUser(model interface{}) error {
 		return fmt.Errorf("Controller AuthGetUser: Expected pointer model input! Received non-pointer type.")
 	}
 
-	preloadErr := ctr.Db.Where("id = ?", ctr.Auth.Username).First(model).Error
+	tx := ctr.Db
+	for _, pre := range preload {
+		tx = tx.Preload(pre)
+	}
+	preloadErr := tx.Where("id = ?", ctr.Auth.Username).First(model).Error
+
 	if preloadErr != nil {
 		return fmt.Errorf("Controller AuthGetUser getting user (%s) failed: \n%v", ctr.Auth.Username, preloadErr)
 	}

@@ -34,8 +34,9 @@ type AuthGroup struct {
 }
 
 type Config struct {
-	Server ServerConfig
-	Db     DatabaseConfig
+	Server 	ServerConfig
+	Db     	DatabaseConfig
+	DbAlt	*DatabaseConfig		`json:"db_alt,omitempty"`
 
 	StoragePaths []FilePath
 	MappedPaths  map[string]*FilePath

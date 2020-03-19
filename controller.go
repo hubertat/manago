@@ -40,6 +40,7 @@ type Controlled interface {
 	AuthGetUser(interface{}, ...string) error
 	FirstPreload(interface{}, uint, ...string) error
 	GetModel(interface{}, ...string) error
+	GetAltDbConfig() *DatabaseConfig
 }
 
 type File interface {
@@ -202,8 +203,9 @@ func (ctr *Controller) SetError(code int, err error, msg ...string) {
 			ctr.E.Err = errors.New(msg[0])
 		}
 	} else {
-
-		ctr.E.Msg = err.Error()
+		if err != nil {
+			ctr.E.Msg = err.Error()
+		}
 	}
 
 	log.Printf("BaseController SetError fired, received:\n= %d\n= %v\n= %v\n", code, err, msg)
@@ -444,4 +446,8 @@ func (ctr *Controller) AppendAuthUser(user interface{}, model interface{}, field
 	}
 
 	return ctr.Db.Model(model).Association(field).Append(user).Error
+}
+
+func (ctr *Controller) GetAltDbConfig() (config *DatabaseConfig) {
+	return ctr.Man.Config.DbAlt
 }

@@ -55,9 +55,9 @@ func (pag *Paginator) QueryInFields(modelSlice interface{}, query string, fields
 	tx := pag.controller.Man.Dbc.DB
 	for ix, field := range fields {
 		if ix == 0 {
-			tx = tx.Where(fmt.Sprintf("%s LIKE ?", field), "%" + strings.ToLower(query) + "%")	
+			tx = tx.Where(fmt.Sprintf("LOWER(%s) LIKE ?", field), "%" + strings.ToLower(query) + "%")	
 		} else {
-			tx = tx.Or(fmt.Sprintf("%s LIKE ?", field), "%" + strings.ToLower(query) + "%")
+			tx = tx.Or(fmt.Sprintf("LOWER(%s) LIKE ?", field), "%" + strings.ToLower(query) + "%")
 		}
 	}
 	

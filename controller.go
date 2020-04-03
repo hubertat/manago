@@ -175,6 +175,8 @@ func (ctr *Controller) StartSession(s *session.Manager, w http.ResponseWriter, r
 	}
 
 	ctr.Req.SetCtQuick(ctr.Auth)
+	ctr.Req.SetCt("AppVersion", ctr.Man.AppVersion)
+	ctr.Req.SetCt("AppBuild", ctr.Man.AppBuild)
 	return nil
 }
 

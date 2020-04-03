@@ -23,14 +23,28 @@ type Manager struct {
 	Views  	*ViewSet
 	Dbc    	*Db
 	Mid		*MiddlewareManager
+
+	AppVersion		string
+	AppBuild		string
 }
 
-func New(conf Config, allCtrs []interface{}, allModels []interface{}) (man *Manager, err error) {
+func New(conf Config, allCtrs []interface{}, allModels []interface{}, build ...string) (man *Manager, err error) {
 	man = &Manager{
 		Config: conf,
 		router: httprouter.New(),
 		Dbc:    &Db{},
 		Views:  &ViewSet{},
+	}
+
+	if len(build) > 0 {
+		if len(build[0]) == 0 {
+			man.AppVersion = "v_dev"
+		} else {
+			man.AppVersion = build[0]	
+		}
+	}
+	if len(build) > 1 {
+		man.AppBuild = build[1]
 	}
 
 	man.controllersReflected = make(map[string]reflect.Type)

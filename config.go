@@ -43,7 +43,9 @@ type Config struct {
 	DefaultPath  string
 	TmpPath      string
 
-	TemplatesPath string
+	TemplatesPath 	string
+	StaticPath		string
+	WebStaticPath	string
 
 	AuthGroups []AuthGroup
 	MappedAuth map[string]*AuthGroup
@@ -66,7 +68,9 @@ func (c *Config) FillDefaults() {
 	c.Db.Server = "sqlite"
 	c.Db.SqlitePath = "./sqlite/gorm.db"
 
-	c.TemplatesPath = "./static/templates/"
+	c.StaticPath = "./static/"
+	c.TemplatesPath = c.StaticPath + "templates/"
+	c.WebStaticPath = c.StaticPath + "web/"
 
 	c.DefaultPath = "./files/"
 }

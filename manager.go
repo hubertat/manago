@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"reflect"
 	"strings"
+	"os"
 )
 
 type Manager struct {
@@ -120,6 +121,12 @@ func (man *Manager) Start() (status string) {
 }
 
 func (man *Manager) MakeRoutes() {
+
+	prepareStatic, _ := FileDirExists(man.Config.WebStaticPath)
+	
+	if prepareStatic {
+		man.router.ServeFiles("/static/*filepath", http.Dir(man.Config.WebStaticPath))
+	}
 
 	for _, typ := range man.controllersReflected {
 		log.Printf("Manager MakeRoutes: preparing routes for %s", typ.Name())
@@ -298,4 +305,17 @@ func (man *Manager) Handle(params ...string) httprouter.Handle {
 		}
 
 	}
+}
+
+func FileDirExists(path string) (bool, error) {
+    _, err := os.Stat(path)
+    if err == nil {
+    	return true, nil 
+    }
+    
+    if os.IsNotExist(err) {
+    	return false, nil 
+    }
+    
+    return true, err
 }

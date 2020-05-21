@@ -238,6 +238,12 @@ func (ctr *Controller) FillModel(model interface{}) int {
 					v.Field(ix).SetInt(iVal)
 					valuesCount++
 				}
+			case uint:
+				iVal, iErr := strconv.ParseUint(formVal, 10, 64)
+				if iVal > 0 && iErr == nil {
+					v.Field(ix).SetUint(iVal)
+					valuesCount++
+				}
 			case bool:
 				bVal, err := strconv.ParseBool(formVal)
 				if err == nil {

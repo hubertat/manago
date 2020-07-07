@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"reflect"
+	"time"
 	"strconv"
 
 	"github.com/astaxie/beego/session"
@@ -256,6 +257,12 @@ func (ctr *Controller) FillModel(model interface{}) int {
 					}
 				}
 
+			case time.Time:
+				time, err := time.Parse("2006-01-02", formVal)
+				if err == nil {
+					v.Field(ix).Set(reflect.ValueOf(time))
+					valuesCount++
+				}
 			default:
 
 			}

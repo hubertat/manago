@@ -283,7 +283,15 @@ func (man *Manager) Handle(params ...string) httprouter.Handle {
 			ctr.SetRedir(redirAddr)
 		}
 
-		if man.Mid.ctrRunBefore(ctrName, mtdName, ctr) {
+		var middlewarePermission bool
+
+		if man.Config.DevSkipMiddleware && man.AppVersion == "v_dev" {
+			middlewarePermission = true
+		} else {
+			middlewarePermission = man.Mid.ctrRunBefore(ctrName, mtdName, ctr)
+		}
+
+		if middlewarePermission {
 			method.Call([]reflect.Value{})	
 		}
 

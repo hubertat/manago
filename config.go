@@ -49,6 +49,8 @@ type Config struct {
 
 	AuthGroups []AuthGroup
 	MappedAuth map[string]*AuthGroup
+
+	DevSkipMiddleware	bool
 }
 
 func (c *Config) Load(input string) (err error) {

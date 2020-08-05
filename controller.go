@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"reflect"
 	"time"
 	"strconv"
@@ -42,6 +43,8 @@ type Controlled interface {
 	FirstPreload(interface{}, uint, ...string) error
 	GetModel(interface{}, ...string) error
 	GetAltDbConfig() *DatabaseConfig
+	CallClient(string, string, url.Values, interface{}) error
+	VerifyApiKey() bool
 }
 
 type File interface {
@@ -286,18 +289,20 @@ func (ctr *Controller) GetModel(model interface{}, preload ...string) (err error
 
 	// log.Printf("Model name: %s, Snake Name: %s", modelName, snakeName)
 
+	formFieldName := snakeName + "_id"
+
 	if ctr.Req.Id > 0 {
 		modelId = uint(ctr.Req.Id)
 		// log.Printf("Non zero Data.Id: %d", modelId)
 	} else {
 		if ctr.Req.FormInt(snakeName+"_id") > 0 {
-			modelId = ctr.Req.FormInt(snakeName + "_id")
+			modelId = ctr.Req.FormInt(formFieldName)
 			// log.Printf("Non zero form snakeName id: %d", modelId)
 		}
 	}
 
 	if modelId == 0 {
-		err = errors.New("GetModel failed, id not found")
+		err = fmt.Errorf("GetModel failed, id not found (Req.Id: %d, form: %s = %d)", ctr.Req.Id, formFieldName, ctr.Req.FormInt(formFieldName))
 		ctr.SetError(400, err)
 		return
 	}
@@ -465,4 +470,22 @@ func (ctr *Controller) AppendAuthUser(user interface{}, model interface{}, field
 
 func (ctr *Controller) GetAltDbConfig() (config *DatabaseConfig) {
 	return ctr.Man.Config.DbAlt
+}
+
+func (ctr *Controller) CallClient(name string, path string, params url.Values, result interface{}) error {
+	client, present := ctr.Man.Clients[name]
+	if !present {
+		return fmt.Errorf("Controller CallClient: client not found (%s)", name)
+	}
+
+	return client.Call(path, params, result)
+}
+
+func (ctr *Controller) VerifyApiKey() bool {
+	
+	if ctr.Man.Config.ApiKey == nil {	
+		return false
+	}
+
+	return *ctr.Man.Config.ApiKey == ctr.Req.FormSingle("api_key")
 }

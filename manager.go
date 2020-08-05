@@ -24,6 +24,7 @@ type Manager struct {
 	Views  	*ViewSet
 	Dbc    	*Db
 	Mid		*MiddlewareManager
+	Clients	map[string]Client
 
 	AppVersion		string
 	AppBuild		string
@@ -35,6 +36,7 @@ func New(conf Config, allCtrs []interface{}, allModels []interface{}, build ...s
 		router: httprouter.New(),
 		Dbc:    &Db{},
 		Views:  &ViewSet{},
+		Clients: conf.Clients,
 	}
 
 	if len(build) > 0 {
@@ -186,7 +188,17 @@ func (man *Manager) HandleJson(ctrName, mtdName string) httprouter.Handle {
 			return
 		}
 
-		method.Call([]reflect.Value{})
+		var middlewarePermission bool
+
+		if man.Config.DevSkipMiddleware && man.AppVersion == "v_dev" {
+			middlewarePermission = true
+		} else {
+			middlewarePermission = man.Mid.ctrRunBefore(ctrName, mtdName, ctr)
+		}
+
+		if middlewarePermission {
+			method.Call([]reflect.Value{})	
+		}
 
 		json, errJson := ctr.JsonCtnt()
 		if errJson != nil {

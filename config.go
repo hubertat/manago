@@ -51,6 +51,9 @@ type Config struct {
 	MappedAuth map[string]*AuthGroup
 
 	DevSkipMiddleware	bool
+
+	ApiKey			*string
+	Clients			map[string]Client
 }
 
 func (c *Config) Load(input string) (err error) {

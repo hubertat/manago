@@ -32,6 +32,7 @@ type Controlled interface {
 	IsError() bool
 	GetError() StatusError
 	SetError(int, error, ...string)
+	ClearError()
 	SetManager(*Manager)
 	SetRouter(*httprouter.Router)
 	SetReqData(*http.Request, httprouter.Params)
@@ -215,6 +216,12 @@ func (ctr *Controller) SetError(code int, err error, msg ...string) {
 	}
 
 	log.Printf("BaseController SetError fired, received:\n= %d\n= %v\n= %v\n", code, err, msg)
+}
+
+func (ctr *Controller) ClearError() {
+	ctr.E.Code = 0
+	ctr.E.Err = nil
+	ctr.E.Msg = ""
 }
 
 func (ctr *Controller) FillModel(model interface{}) int {

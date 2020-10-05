@@ -327,6 +327,90 @@ func (man *Manager) Handle(params ...string) httprouter.Handle {
 	}
 }
 
+func (man *Manager) HandleDirect(params ...string) httprouter.Handle {
+
+	var ctrName, mtdName string
+
+	switch len(params) {
+	case 2:
+		ctrName = params[0]
+		mtdName = params[1]
+		
+	
+	default:
+		log.Fatal("Manager HandleDirect: wrong parameter count!")
+
+	}
+
+	log.Printf("Manager HandleDirect: preparing: %v %v ", mtdName)
+
+	typ, isOk := man.controllersReflected[ctrName]
+	if !isOk {
+		log.Fatalf("Manager HandleDirect: controller [%s] not found!", ctrName)
+	}
+
+	if !reflect.New(typ).MethodByName(mtdName).IsValid() {
+		log.Fatalf("Manager HandleDirect: method[%v] not found!", mtdName)
+	}
+
+	return func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+
+		ctr := reflect.New(typ).Interface().(Controlled)
+
+		method := reflect.ValueOf(ctr).MethodByName(mtdName)
+
+		input := []reflect.Value{
+			reflect.ValueOf(w),
+			reflect.ValueOf(r),
+			reflect.ValueOf(ps),
+		}
+
+
+		log.Printf("%T HandleDirect: method[%v]", ctr, mtdName)
+
+		ctr.SetReqData(r, ps)
+
+		ctr.SetManager(man)
+
+		dbh, err := ctr.SetupDB(man.Dbc)
+		
+		if err != nil {
+			log.Print(err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer dbh.Close()
+
+		err = ctr.StartSession(man.sessionManager, w, r)
+		defer ctr.SessionRelease(w)
+		if err != nil {
+			log.Print(err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		var middlewarePermission bool
+
+		if man.Config.DevSkipMiddleware && man.AppVersion == "v_dev" {
+			middlewarePermission = true
+		} else {
+			middlewarePermission = man.Mid.ctrRunBefore(ctrName, mtdName, ctr)
+		}
+
+		if middlewarePermission {
+			method.Call(input)	
+		}
+
+		if ctr.IsError() {
+			log.Print("Error from controller detected, serving:")
+			log.Print(ctr.GetError().Msg)
+			log.Print(ctr.GetError().Err)
+			http.Error(w, ctr.GetError().Msg, ctr.GetError().Code)
+		} 
+
+	}
+}
+
 func FileDirExists(path string) (bool, error) {
     _, err := os.Stat(path)
     if err == nil {

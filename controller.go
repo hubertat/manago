@@ -56,8 +56,9 @@ type File interface {
 
 
 type Auth struct {
-	IsIn     bool
-	Username string
+	IsIn     	bool
+	Username 	string
+	Guid		string
 }
 
 type StatusError struct {
@@ -115,6 +116,10 @@ func (ctr *Controller) SetRedir(input string) {
 
 func (ctr *Controller) HandleJson(mtdName string) httprouter.Handle {
 	return ctr.Man.HandleJson(ctr.Name, mtdName)
+}
+
+func (ctr *Controller) HandleDirect(mtdName string) httprouter.Handle {
+	return ctr.Man.HandleDirect(ctr.Name, mtdName)
 }
 
 func (ctr *Controller) Handle(options ...string) httprouter.Handle {
@@ -176,7 +181,14 @@ func (ctr *Controller) StartSession(s *session.Manager, w http.ResponseWriter, r
 
 	case string:
 		ctr.Auth.IsIn = true
-		ctr.Auth.Username = auth
+		ctr.Auth.Guid = auth
+
+	}
+
+	username := ctr.Session.Get("username")
+	switch username := username.(type) {
+		case string:
+			ctr.Auth.Username = username
 	}
 
 	ctr.Req.SetCtQuick(ctr.Auth)
@@ -443,7 +455,7 @@ func (ctr *Controller) AuthGetUser(model interface{}, preload ...string) error {
 	for _, pre := range preload {
 		tx = tx.Preload(pre)
 	}
-	preloadErr := tx.Where("id = ?", ctr.Auth.Username).First(model).Error
+	preloadErr := tx.Where("id = ?", ctr.Auth.Guid).First(model).Error
 
 	if preloadErr != nil {
 		return fmt.Errorf("Controller AuthGetUser getting user (%s) failed: \n%v", ctr.Auth.Username, preloadErr)

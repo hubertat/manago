@@ -126,9 +126,14 @@ func (req *Request) FormInt(name string) uint {
 }
 
 func (req *Request) FormDate(name string, tm *time.Time) bool {
-	time, err := time.Parse("2006-01-02", req.FormSingle(name))
+	tParsed, err := time.Parse("2006-01-02", req.FormSingle(name))
 	if err == nil {
-		*tm = time
+		hundretYears, _ := time.ParseDuration("876000h")
+		if time.Since(tParsed) > hundretYears {
+			return false
+		}
+
+		*tm = tParsed
 		return true
 	} else {
 		log.Print(err)

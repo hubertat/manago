@@ -376,18 +376,12 @@ func (ctr *Controller) LookForFileponds(model interface{}, file File, params ...
 		return
 	}
 	modelName := reflect.Indirect(reflect.ValueOf(model)).Type().Name()
-	var pathName, subPath string
+	var pathName string
 	var nestedPath bool
-	switch len(params) {
-	case 1:
-		pathName = params[0]
-	case 2:
-		pathName = params[0]
-		subPath = params[1]
-		nestedPath = true
-	default:
+	if len(params) == 0 {
 		pathName = strcase.ToSnake(modelName)
-
+	} else {
+		nestedPath = true
 	}
 
 	var fId *FileId
@@ -421,7 +415,8 @@ func (ctr *Controller) LookForFileponds(model interface{}, file File, params ...
 				return fParsed, err
 			}
 			if nestedPath {
-				err = file.MoveTemp(storagePath, subPath)
+				params[0] = storagePath
+				err = file.MoveTemp(params...)
 			} else {
 				err = file.MoveTemp(storagePath)
 			}

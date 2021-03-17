@@ -65,6 +65,12 @@ func (pag *Paginator) QueryInFields(modelSlice interface{}, query string, fields
 	return pag.RunTransaction(modelSlice, tx)
 }
 
+func (pag *Paginator) MsSqlOffsetLine() string {
+
+	return fmt.Sprintf("OFFSET %d ROWS FETCH NEXT %d ROWS ONLY", pag.getOffset(), pag.getLimit())
+
+}
+
 func (pag *Paginator) FindModel(modelSlice interface{}, query interface{}) error {
 	return pag.RunTransaction(modelSlice, pag.controller.Man.Dbc.DB.Where(query))
 }

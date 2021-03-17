@@ -37,7 +37,7 @@ func (vs *ViewSet) Load(conf *Config) (err error) {
 		return
 	}
 
-	err = vs.parseTemplatesFiles(partials, vs.templatesLocation, strings.Trim(vs.partialsLocation, "."))
+	err = vs.parseFolderNested(partials, vs.templatesLocation, strings.Trim(vs.partialsLocation, "."))
 
 	if err != nil {
 		err = fmt.Errorf("templates NewViews: %w", err)
@@ -46,7 +46,7 @@ func (vs *ViewSet) Load(conf *Config) (err error) {
 	return
 }
 
-func (vs *ViewSet) parseTemplatesFiles(layouts *template.Template, dirName string, dirExcluded string) error {
+func (vs *ViewSet) parseFolderNested(layouts *template.Template, dirName string, dirExcluded string) error {
 	log.Print("Looking for templates in: ", dirName)
 
 	files, err := ioutil.ReadDir(dirName)
@@ -61,7 +61,7 @@ func (vs *ViewSet) parseTemplatesFiles(layouts *template.Template, dirName strin
 			filename := file.Name()
 
 			if file.IsDir() {
-				err = vs.parseTemplatesFiles(layouts, dirName+filename+"/", dirExcluded)
+				err = vs.parseFolderNested(layouts, dirName+filename+"/", dirExcluded)
 				if err != nil {
 					return err
 				}
@@ -117,6 +117,7 @@ func (vs *ViewSet) parseFolder(dir string, fileExtension string, sT *template.Te
 			"tDate":   tDate,
 			"sLimit":  tLimitString,
 			"tFindInput":  tFindInput,
+			"uintToString": uintToString,
 		}).ParseFiles(filesToParse...)
 	} else {
 		return sT.ParseFiles(filesToParse...)
@@ -179,7 +180,7 @@ func tFindInput(s ...string) (output map[string]string) {
 	output = make(map[string]string)
 
 	if len(s) < 3 {
-		return 
+		return
 	}
 	
 	output["Title"] = s[0]
@@ -192,5 +193,17 @@ func tFindInput(s ...string) (output map[string]string) {
 
 	output["FindFields"] = s[3]
 
+	if len(s) < 6 {
+		return
+	}
+
+	output["SelectedOption"] = "true"
+	output["SelectedVal"] = s[4]
+	output["SelectedName"] = s[5]
+	
 	return
+}
+
+func uintToString(val uint) string {
+	return fmt.Sprintf("%d", val)
 }

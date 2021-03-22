@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"reflect"
 	"strings"
+	"io/fs"
 	"os"
 )
 
@@ -25,6 +26,7 @@ type Manager struct {
 	Dbc    	*Db
 	Mid		*MiddlewareManager
 	Clients	map[string]Client
+	StaticFsys	fs.FS
 
 	AppVersion		string
 	AppBuild		string
@@ -90,7 +92,9 @@ func New(conf Config, allCtrs []interface{}, allModels []interface{}, build ...s
 	man.MakeRoutes()
 	man.PrepareMiddlewares()
 
-	err = man.Views.Load(&conf)
+	man.StaticFsys = os.DirFS("./")
+
+	err = man.Views.Load(&conf, man)
 	if err != nil {
 		err = fmt.Errorf("ERROR Manager New: views set failed: %w", err)
 		return

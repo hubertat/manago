@@ -46,6 +46,7 @@ type Config struct {
 	TemplatesPath 	string
 	StaticPath		string
 	WebStaticPath	string
+	ForceLiveTemplates	bool
 
 	AuthGroups []AuthGroup
 	MappedAuth map[string]*AuthGroup

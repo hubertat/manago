@@ -3,126 +3,105 @@ package manago
 import (
 	"fmt"
 	"html/template"
-	"io/ioutil"
+	"io/fs"
 	"log"
 	"net/http"
 	"strings"
 	"time"
+	// "embed"
 )
 
 type ViewSet struct {
 	templatesLocation string
 	partialsLocation  string
 	ts                map[string]*template.Template
+	baseTemplate	*template.Template
+	forceLivePath	bool
 }
 
-func (vs *ViewSet) Load(conf *Config) (err error) {
+
+// var staticEmbeded embed.FS
+
+func (vs *ViewSet) Load(conf *Config, man *Manager) (err error) {
 
 	vs.ts = make(map[string]*template.Template)
 
-	var layouts, partials *template.Template
+	vs.templatesLocation = strings.Trim(conf.TemplatesPath, "\\/.")
+	vs.forceLivePath = conf.ForceLiveTemplates
+	vs.partialsLocation = "/partials"
 
-	vs.templatesLocation = conf.TemplatesPath
-	vs.partialsLocation = vs.templatesLocation + "partials/"
+	
 
-	layouts, err = vs.parseFolder(vs.templatesLocation, ".gohtml", nil)
+	err = fs.WalkDir(man.StaticFsys, vs.templatesLocation, vs.walkForBase)
 	if err != nil {
-		err = fmt.Errorf("templates NewViews: parsing base failed: %w", err)
-		return
+		err = fmt.Errorf("templates Load: walking for base failed: %w", err)
 	}
 
-	partials, err = vs.parseFolder(vs.partialsLocation, ".html", layouts)
-	if err != nil {
-		err = fmt.Errorf("templates NewViews parsing partials failed: %w", err)
-		return
-	}
-
-	err = vs.parseFolderNested(partials, vs.templatesLocation, strings.Trim(vs.partialsLocation, "."))
+	err = fs.WalkDir(man.StaticFsys, vs.templatesLocation, vs.walkFolders)
 
 	if err != nil {
-		err = fmt.Errorf("templates NewViews: %w", err)
+		err = fmt.Errorf("templates Load: walking dir failed: %w", err)
 	}
 
 	return
 }
 
-func (vs *ViewSet) parseFolderNested(layouts *template.Template, dirName string, dirExcluded string) error {
-	log.Print("Looking for templates in: ", dirName)
-
-	files, err := ioutil.ReadDir(dirName)
+func (vs *ViewSet) walkFolders(path string, d fs.DirEntry, err error) error {
 	if err != nil {
-		panic("cannot read templates directory")
+		return fmt.Errorf("walkFolders received error: %v", err)
 	}
-	if !strings.Contains(dirName, dirExcluded) {
-		// regular templates
-		log.Printf("Found %d files in %s", len(files), dirName)
-		for _, file := range files {
 
-			filename := file.Name()
+	if !strings.Contains(path, vs.partialsLocation) && strings.Contains(strings.ToLower(d.Name()), ".html") && !d.IsDir() {
+		// .html file, treating like template
+		name := strings.TrimPrefix(strings.TrimSuffix(path, ".html"), vs.templatesLocation)
+		name = strings.Trim(name, "\\/.")
+		log.Printf("walkFolders found template file: %s and saving as: %s", d.Name(), name)
 
-			if file.IsDir() {
-				err = vs.parseFolderNested(layouts, dirName+filename+"/", dirExcluded)
-				if err != nil {
-					return err
-				}
-			} else if strings.HasSuffix(filename, ".html") {
-				// regular template
-				shortDir := strings.TrimPrefix(dirName, vs.templatesLocation)
-				name := shortDir + strings.TrimSuffix(filename, ".html")
-				log.Print("Saving on: ", name, " file: ", filename, " in dir: ", dirName)
+		var tempErr error
+		t, tempErr := vs.baseTemplate.Clone()
+		if tempErr != nil {
+			return fmt.Errorf("walkFolders error when cloning template: %v\n", tempErr)
+		}
+		vs.ts[name], tempErr = t.New(name).ParseFiles(path)
+		if err != nil {
+			return fmt.Errorf("walkFolders error when template ParseFiles: %v\n", tempErr)
+		}
+	}
 
-				t, cerr := layouts.Clone()
-				if cerr != nil {
-					return cerr
-				}
-				vs.ts[name], err = t.New(name).ParseFiles(dirName + filename)
-				if err != nil {
-					return err
-				}
+	return nil
+}
+
+func (vs *ViewSet) walkForBase(path string, d fs.DirEntry, err error) error {
+	if err != nil {
+		return fmt.Errorf("walkForBase received error: %v", err)
+	}
+
+	if !d.IsDir() {
+		if strings.Contains(strings.ToLower(d.Name()), ".gohtml") || (strings.Contains(path, vs.partialsLocation) && strings.Contains(strings.ToLower(d.Name()), ".html") ) {
+			name := strings.ToLower(d.Name())
+			log.Printf("Found and parsing %s as %s", path, name)
+
+			var tempErr error
+
+			if vs.baseTemplate == nil {
+				vs.baseTemplate, tempErr = template.New("zero").Funcs(template.FuncMap{
+					"isNot":   tFuncIsNot,
+					"tSimple": tTime,
+					"tDate":   tDate,
+					"sLimit":  tLimitString,
+					"tFindInput":  tFindInput,
+					"uintToString": uintToString,
+				}).ParseFiles(path)
+			} else {
+				vs.baseTemplate, tempErr = vs.baseTemplate.ParseFiles(path)
+			}
+			if tempErr != nil {
+				return fmt.Errorf("walkForBase error from parsing template: %v\n", tempErr)
 			}
 		}
 	}
-
-	return err
-}
-
-func (vs *ViewSet) parseFolder(dir string, fileExtension string, sT *template.Template) (*template.Template, error) {
-	log.Printf("Looking for template files[%v] in: %v", fileExtension, dir)
-	var filesToParse []string
-
-	files, err := ioutil.ReadDir(dir)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(files) == 0 {
-		return sT, nil
-	}
-
-	for _, file := range files {
-
-		filename := file.Name()
-
-		if strings.HasSuffix(filename, fileExtension) {
-			filesToParse = append(filesToParse, dir+filename)
-		}
-	}
-
-	log.Printf("Found and parsing %d files in %v.", len(filesToParse), dir)
-
-	if sT == nil {
-		return template.New("zero").Funcs(template.FuncMap{
-			"isNot":   tFuncIsNot,
-			"tSimple": tTime,
-			"tDate":   tDate,
-			"sLimit":  tLimitString,
-			"tFindInput":  tFindInput,
-			"uintToString": uintToString,
-		}).ParseFiles(filesToParse...)
-	} else {
-		return sT.ParseFiles(filesToParse...)
-	}
-
+	
+	return nil
 }
 
 func (vs *ViewSet) GetT(name string) *template.Template {

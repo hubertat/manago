@@ -45,6 +45,7 @@ type Controlled interface {
 	GetAltDbConfig() *DatabaseConfig
 	CallClient(string, string, url.Values, interface{}) error
 	VerifyApiKey() bool
+	QuickSendMessage(string) error
 }
 
 type File interface {
@@ -501,4 +502,12 @@ func (ctr *Controller) VerifyApiKey() bool {
 	}
 
 	return *ctr.Man.Config.ApiKey == ctr.Req.FormSingle("api_key")
+}
+
+func (ctr *Controller) QuickSendMessage(text string) error {
+	if ctr.Man.Messaging == nil {
+		return fmt.Errorf("QuickSendMessage failed: no messaging configured.")
+	}
+
+	return ctr.Man.Messaging.QuickSend(text)
 }

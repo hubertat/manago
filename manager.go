@@ -21,12 +21,13 @@ type Manager struct {
 	controllersReflected map[string]reflect.Type
 	modelsReflected      map[string]reflect.Type
 
-	Config 	Config
-	Views  	*ViewSet
-	Dbc    	*Db
-	Mid		*MiddlewareManager
-	Clients	map[string]Client
+	Config 		Config
+	Views  		*ViewSet
+	Dbc    		*Db
+	Mid			*MiddlewareManager
+	Clients		map[string]Client
 	StaticFsys	fs.FS
+	Messaging 	*Slack
 
 	AppVersion		string
 	AppBuild		string
@@ -103,6 +104,10 @@ func New(conf Config, allCtrs []interface{}, allModels []interface{}, build ...s
 	err = man.Dbc.Check(man.Config.Db)
 	if err != nil {
 		err = fmt.Errorf("ERROR Manager New: Database check error:\n%v", err)
+	}
+
+	if conf.SlackHook != nil {
+		man.Messaging = &Slack{HookUrl: *conf.SlackHook}
 	}
 
 	return

@@ -55,6 +55,8 @@ type Config struct {
 
 	ApiKey			*string
 	Clients			map[string]Client
+
+	SlackHook		*string	`json:",omitempty"`
 }
 
 func (c *Config) Load(input string) (err error) {

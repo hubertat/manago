@@ -108,12 +108,20 @@ func New(conf Config, allCtrs []interface{}, allModels []interface{}, build ...s
 	return
 }
 
-func (man *Manager) ReloadStaticFs(fsys fs.FS) (err error) {
+func (man *Manager) ReloadStaticFS(fsys fs.FS) (err error) {
+	log.Println("Reloading Static FS, will reload Views and make new httprouter.")
+	
 	if fsys == nil {
 		err = fmt.Errorf("Manager Reloading static FS: received nil!")
 		return
 	}
-	man.StaticFsys = fsys
+	subStatic, errSub := fs.Sub(fsys, "static")
+	if errSub == nil {
+		man.StaticFsys = subStatic
+	} else {
+		man.StaticFsys = fsys	
+	}
+	
 
 	err = man.Views.Load(&man.Config, man)
 	if err != nil {
@@ -121,7 +129,8 @@ func (man *Manager) ReloadStaticFs(fsys fs.FS) (err error) {
 		return
 	}
 
-	err = man.makeStaticRoutes()
+	man.router = httprouter.New()
+	man.MakeRoutes()
 
 	return
 }

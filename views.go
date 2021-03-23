@@ -16,7 +16,6 @@ type ViewSet struct {
 	partialsLocation  string
 	ts                map[string]*template.Template
 	baseTemplate	*template.Template
-	forceLivePath	bool
 	man				*Manager			
 }
 
@@ -33,7 +32,6 @@ func (vs *ViewSet) Load(conf *Config, manager *Manager) (err error) {
 	}
 
 	vs.templatesLocation = strings.Trim(conf.TemplatesPath, "\\/.")
-	vs.forceLivePath = conf.ForceLiveTemplates
 	vs.partialsLocation = "/partials"
 
 	

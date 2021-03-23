@@ -95,6 +95,7 @@ func (vs *ViewSet) walkForBase(path string, d fs.DirEntry, err error) error {
 					"sLimit":  tLimitString,
 					"tFindInput":  tFindInput,
 					"uintToString": uintToString,
+					"sLimitVar":	tLimitStringVar,
 				}).ParseFS(vs.man.StaticFsys, path)
 			} else {
 				vs.baseTemplate, tempErr = vs.baseTemplate.ParseFS(vs.man.StaticFsys, path)
@@ -155,6 +156,17 @@ func tDate(t time.Time) string {
 func tLimitString(s string) string {
 	if len(s) > 18 {
 		return s[:16] + "..."
+	}
+	return s
+}
+
+func tLimitStringVar(s string, length int) string {
+	if length == 0 {
+		length = 18
+	}
+
+	if len(s) > length {
+		return s[:length] + "..."
 	}
 	return s
 }

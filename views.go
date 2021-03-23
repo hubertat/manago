@@ -17,14 +17,20 @@ type ViewSet struct {
 	ts                map[string]*template.Template
 	baseTemplate	*template.Template
 	forceLivePath	bool
+	man				*Manager			
 }
 
 
 // var staticEmbeded embed.FS
 
-func (vs *ViewSet) Load(conf *Config, man *Manager) (err error) {
-
+func (vs *ViewSet) Load(conf *Config, manager *Manager) (err error) {
+	vs.man = manager
 	vs.ts = make(map[string]*template.Template)
+
+	if manager.StaticFsys == nil {
+		err = fmt.Errorf("No static FS! Aborting")
+		return
+	}
 
 	vs.templatesLocation = strings.Trim(conf.TemplatesPath, "\\/.")
 	vs.forceLivePath = conf.ForceLiveTemplates
@@ -32,12 +38,12 @@ func (vs *ViewSet) Load(conf *Config, man *Manager) (err error) {
 
 	
 
-	err = fs.WalkDir(man.StaticFsys, vs.templatesLocation, vs.walkForBase)
+	err = fs.WalkDir(manager.StaticFsys, vs.templatesLocation, vs.walkForBase)
 	if err != nil {
 		err = fmt.Errorf("templates Load: walking for base failed: %w", err)
 	}
 
-	err = fs.WalkDir(man.StaticFsys, vs.templatesLocation, vs.walkFolders)
+	err = fs.WalkDir(manager.StaticFsys, vs.templatesLocation, vs.walkFolders)
 
 	if err != nil {
 		err = fmt.Errorf("templates Load: walking dir failed: %w", err)
@@ -57,12 +63,12 @@ func (vs *ViewSet) walkFolders(path string, d fs.DirEntry, err error) error {
 		name = strings.Trim(name, "\\/.")
 		log.Printf("walkFolders found template file: %s and saving as: %s", d.Name(), name)
 
-		var tempErr error
+		
 		t, tempErr := vs.baseTemplate.Clone()
 		if tempErr != nil {
 			return fmt.Errorf("walkFolders error when cloning template: %v\n", tempErr)
 		}
-		vs.ts[name], tempErr = t.New(name).ParseFiles(path)
+		vs.ts[name], tempErr = t.New(name).ParseFS(vs.man.StaticFsys, path)
 		if err != nil {
 			return fmt.Errorf("walkFolders error when template ParseFiles: %v\n", tempErr)
 		}
@@ -91,9 +97,9 @@ func (vs *ViewSet) walkForBase(path string, d fs.DirEntry, err error) error {
 					"sLimit":  tLimitString,
 					"tFindInput":  tFindInput,
 					"uintToString": uintToString,
-				}).ParseFiles(path)
+				}).ParseFS(vs.man.StaticFsys, path)
 			} else {
-				vs.baseTemplate, tempErr = vs.baseTemplate.ParseFiles(path)
+				vs.baseTemplate, tempErr = vs.baseTemplate.ParseFS(vs.man.StaticFsys, path)
 			}
 			if tempErr != nil {
 				return fmt.Errorf("walkForBase error from parsing template: %v\n", tempErr)

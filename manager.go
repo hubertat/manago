@@ -39,6 +39,7 @@ func New(conf Config, allCtrs []interface{}, allModels []interface{}, build ...s
 		Dbc:    &Db{},
 		Views:  &ViewSet{},
 		Clients: conf.Clients,
+		StaticFsys: os.DirFS("./static"),
 	}
 
 	if len(build) > 0 {
@@ -92,8 +93,6 @@ func New(conf Config, allCtrs []interface{}, allModels []interface{}, build ...s
 	man.MakeRoutes()
 	man.PrepareMiddlewares()
 
-	man.StaticFsys = os.DirFS("./")
-
 	err = man.Views.Load(&conf, man)
 	if err != nil {
 		err = fmt.Errorf("ERROR Manager New: views set failed: %w", err)
@@ -105,6 +104,24 @@ func New(conf Config, allCtrs []interface{}, allModels []interface{}, build ...s
 	if err != nil {
 		err = fmt.Errorf("ERROR Manager New: Database check error:\n%v", err)
 	}
+
+	return
+}
+
+func (man *Manager) ReloadStaticFs(fsys fs.FS) (err error) {
+	if fsys == nil {
+		err = fmt.Errorf("Manager Reloading static FS: received nil!")
+		return
+	}
+	man.StaticFsys = fsys
+
+	err = man.Views.Load(&man.Config, man)
+	if err != nil {
+		err = fmt.Errorf("Manager Reloading static FS: views set failed: %w", err)
+		return
+	}
+
+	err = man.makeStaticRoutes()
 
 	return
 }
@@ -128,12 +145,8 @@ func (man *Manager) Start() (status string) {
 
 func (man *Manager) MakeRoutes() {
 
-	prepareStatic, _ := FileDirExists(man.Config.WebStaticPath)
+	man.makeStaticRoutes()
 	
-	if prepareStatic {
-		man.router.ServeFiles("/static/*filepath", http.Dir(man.Config.WebStaticPath))
-	}
-
 	for _, typ := range man.controllersReflected {
 		log.Printf("Manager MakeRoutes: preparing routes for %s", typ.Name())
 		ctr := reflect.New(typ).Interface().(Controlled)
@@ -141,6 +154,23 @@ func (man *Manager) MakeRoutes() {
 		ctr.SetRouter(man.router)
 		ctr.SetRoutes()
 	}
+}
+
+func (man *Manager) makeStaticRoutes() error {
+
+	if man.StaticFsys == nil {
+		return fmt.Errorf("makeStaticRoutes have nil static FS, stop")
+	}
+	
+	staticFiles, statErr := fs.Sub(man.StaticFsys, man.Config.WebStaticPath)	
+	if statErr != nil {
+		return statErr
+	}
+
+	log.Printf("Manager MakeRoutes: found static files to serve, setting up. \n")
+	man.router.ServeFiles("/static/*filepath", http.FS(staticFiles))
+
+	return nil
 }
 
 func (man *Manager) PrepareMiddlewares() {

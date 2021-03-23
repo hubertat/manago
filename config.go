@@ -75,8 +75,8 @@ func (c *Config) FillDefaults() {
 	c.Db.SqlitePath = "./sqlite/gorm.db"
 
 	c.StaticPath = "./static/"
-	c.TemplatesPath = c.StaticPath + "templates/"
-	c.WebStaticPath = c.StaticPath + "web/"
+	c.TemplatesPath = "templates"
+	c.WebStaticPath = "web"
 
 	c.DefaultPath = "./files/"
 }

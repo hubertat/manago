@@ -506,7 +506,7 @@ func (ctr *Controller) VerifyApiKey() bool {
 
 func (ctr *Controller) QuickSendMessage(text string) error {
 	if ctr.Man.Messaging == nil {
-		return fmt.Errorf("QuickSendMessage failed: no messaging configured.")
+		return fmt.Errorf("QuickSendMessage failed: no messenger configured.")
 	}
 
 	return ctr.Man.Messaging.QuickSend(text)

@@ -27,7 +27,7 @@ type Manager struct {
 	Mid			*MiddlewareManager
 	Clients		map[string]Client
 	StaticFsys	fs.FS
-	Messaging 	*Slack
+	Messaging 	Messenger
 
 	AppVersion		string
 	AppBuild		string

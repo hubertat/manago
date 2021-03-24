@@ -8,6 +8,10 @@ import (
 	"bytes"
 	"time"
 )
+type Messenger	interface {
+	Send(Message) 		error
+	QuickSend(string)	error
+}
 
 type Slack struct {
 	HookUrl		string
@@ -15,19 +19,53 @@ type Slack struct {
 }
 
 type Message struct {
-	Topic	string
-	Body	string
+	Topic		string
+	Body		string
+	LinkUrl		*string
+	LinkText	*string
 }
 
 func (ms *Message) GetSlackMessage() ([]byte, error) {
-	
+
+	type SlackText struct {
+		Type	string	`json:"type,omitempty"`
+		Text	string	`json:"text"`
+		Emoji	bool	`json:"emoji,omitempty"`
+	}
+	type SlackAccessory struct {
+		Type	string	`json:"type,omitempty"`
+		Text	*SlackText	`json:"text,omitempty"`
+		Value	string	`json:"value,omitempty"`
+		Url		string	`json:"url,omitempty"`
+		ActionId	string	`json:"action_id,omitempty"`
+	}
+
+	type SlackBlock struct {
+		Type	string 			`json:"type"`
+		Text	*SlackText 		`json:"text,omitempty"`
+		Accessory *SlackAccessory	`json:"accessory,omitempty"`
+	}
 	type SlackMessage struct {
-		Text		string	`json:"text"`
+		Blocks		[]SlackBlock	`json:"blocks,omitempty"`
 	}
 
 	msg := SlackMessage{}
-	msg.Text = ms.Topic + " " + ms.Body
+	msg.Blocks = []SlackBlock{
+		SlackBlock{Type: "divider"},
+	}
 
+	if len(ms.Topic) > 0 {
+		topicBlock := &SlackText{Type: "plain_text", Text: ms.Topic, Emoji: true}
+		msg.Blocks = append(msg.Blocks, SlackBlock{Type: "header", Text: topicBlock})
+	}
+
+	if len(ms.Body) > 0 {
+		bodyBlock := &SlackText{Type: "plain_text", Text: ms.Body, Emoji: true}
+		msg.Blocks = append(msg.Blocks, SlackBlock{Type: "section", Text: bodyBlock})
+		
+	}
+	
+	
 	return json.Marshal(msg)
 }
 
@@ -41,7 +79,7 @@ func (sl *Slack) Send(msg Message) error {
 	if err != nil {
 		return fmt.Errorf("Parsing message to json failed: %v\n", err)
 	}
-	
+	fmt.Printf("%s/n/n",jsonMsg)
 	request, err := http.NewRequest("POST", reqUrl.String(), bytes.NewBuffer(jsonMsg))
 	if err != nil {
 		return fmt.Errorf("Preparing request failed: %v", err)

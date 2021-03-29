@@ -2,44 +2,46 @@ package manago
 
 import (
 	"fmt"
+	"io/fs"
 	"log"
+	"net/http"
+	"os"
+	"reflect"
+	"strings"
+	"time"
+
 	"github.com/astaxie/beego/session"
 	"github.com/iancoleman/strcase"
 	"github.com/julienschmidt/httprouter"
-	"net/http"
-	"reflect"
-	"strings"
-	"io/fs"
-	"os"
 )
 
 type Manager struct {
-	sessionManager 	*session.Manager
-	router         	*httprouter.Router
-	
+	sessionManager *session.Manager
+	router         *httprouter.Router
 
 	controllersReflected map[string]reflect.Type
 	modelsReflected      map[string]reflect.Type
 
-	Config 		Config
-	Views  		*ViewSet
-	Dbc    		*Db
-	Mid			*MiddlewareManager
-	Clients		map[string]Client
-	StaticFsys	fs.FS
-	Messaging 	Messenger
+	Config     Config
+	Views      *ViewSet
+	Dbc        *Db
+	Mid        *MiddlewareManager
+	Clients    map[string]Client
+	StaticFsys fs.FS
+	Messaging  Messenger
+	CronTasks  []Cron
 
-	AppVersion		string
-	AppBuild		string
+	AppVersion string
+	AppBuild   string
 }
 
 func New(conf Config, allCtrs []interface{}, allModels []interface{}, build ...string) (man *Manager, err error) {
 	man = &Manager{
-		Config: conf,
-		router: httprouter.New(),
-		Dbc:    &Db{},
-		Views:  &ViewSet{},
-		Clients: conf.Clients,
+		Config:     conf,
+		router:     httprouter.New(),
+		Dbc:        &Db{},
+		Views:      &ViewSet{},
+		Clients:    conf.Clients,
 		StaticFsys: os.DirFS("./static"),
 	}
 
@@ -47,7 +49,7 @@ func New(conf Config, allCtrs []interface{}, allModels []interface{}, build ...s
 		if len(build[0]) == 0 {
 			man.AppVersion = "v_dev"
 		} else {
-			man.AppVersion = build[0]	
+			man.AppVersion = build[0]
 		}
 	}
 	if len(build) > 1 {
@@ -100,7 +102,6 @@ func New(conf Config, allCtrs []interface{}, allModels []interface{}, build ...s
 		return
 	}
 
-
 	err = man.Dbc.Check(man.Config.Db)
 	if err != nil {
 		err = fmt.Errorf("ERROR Manager New: Database check error:\n%v", err)
@@ -115,7 +116,7 @@ func New(conf Config, allCtrs []interface{}, allModels []interface{}, build ...s
 
 func (man *Manager) ReloadStaticFS(fsys fs.FS) (err error) {
 	log.Println("Reloading Static FS, will reload Views and make new httprouter.")
-	
+
 	if fsys == nil {
 		err = fmt.Errorf("Manager Reloading static FS: received nil!")
 		return
@@ -124,9 +125,8 @@ func (man *Manager) ReloadStaticFS(fsys fs.FS) (err error) {
 	if errSub == nil {
 		man.StaticFsys = subStatic
 	} else {
-		man.StaticFsys = fsys	
+		man.StaticFsys = fsys
 	}
-	
 
 	err = man.Views.Load(&man.Config, man)
 	if err != nil {
@@ -146,13 +146,17 @@ func (man *Manager) Migrate() error {
 
 func (man *Manager) Start() (status string) {
 
-
 	go man.sessionManager.GC()
 
-	status = fmt.Sprintf("Manager Start http server: %s:%d", man.Config.Server.Host, man.Config.Server.Port)
-	go func(){
+	status = fmt.Sprintf("Manager Start http server: %s:%d\n", man.Config.Server.Host, man.Config.Server.Port)
+	go func() {
 		log.Print(http.ListenAndServe(fmt.Sprintf("%s:%d", man.Config.Server.Host, man.Config.Server.Port), man.router))
 	}()
+
+	if len(man.CronTasks) > 0 {
+		status += "Starting Cron loop."
+		go man.CronLoop()
+	}
 
 	return
 }
@@ -160,7 +164,7 @@ func (man *Manager) Start() (status string) {
 func (man *Manager) MakeRoutes() {
 
 	man.makeStaticRoutes()
-	
+
 	for _, typ := range man.controllersReflected {
 		log.Printf("Manager MakeRoutes: preparing routes for %s", typ.Name())
 		ctr := reflect.New(typ).Interface().(Controlled)
@@ -175,8 +179,8 @@ func (man *Manager) makeStaticRoutes() error {
 	if man.StaticFsys == nil {
 		return fmt.Errorf("makeStaticRoutes have nil static FS, stop")
 	}
-	
-	staticFiles, statErr := fs.Sub(man.StaticFsys, man.Config.WebStaticPath)	
+
+	staticFiles, statErr := fs.Sub(man.StaticFsys, man.Config.WebStaticPath)
 	if statErr != nil {
 		return statErr
 	}
@@ -216,7 +220,7 @@ func (man *Manager) HandleJson(ctrName, mtdName string) httprouter.Handle {
 		method := reflect.ValueOf(ctr).MethodByName(mtdName)
 
 		log.Printf("%T HandleJson: method[%v]", ctr, mtdName)
-	
+
 		ctr.SetReqData(r, ps)
 		ctr.SetManager(man)
 
@@ -245,7 +249,7 @@ func (man *Manager) HandleJson(ctrName, mtdName string) httprouter.Handle {
 		}
 
 		if middlewarePermission {
-			method.Call([]reflect.Value{})	
+			method.Call([]reflect.Value{})
 		}
 
 		json, errJson := ctr.JsonCtnt()
@@ -260,7 +264,7 @@ func (man *Manager) HandleJson(ctrName, mtdName string) httprouter.Handle {
 			http.Error(w, ctr.GetError().Msg, ctr.GetError().Code)
 		} else {
 			w.Header().Set("Content-Type", "application/json")
-  			w.Write(json)		
+			w.Write(json)
 		}
 
 	}
@@ -323,7 +327,7 @@ func (man *Manager) Handle(params ...string) httprouter.Handle {
 		ctr.SetManager(man)
 
 		dbh, err := ctr.SetupDB(man.Dbc)
-		
+
 		if err != nil {
 			log.Print(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -352,7 +356,7 @@ func (man *Manager) Handle(params ...string) httprouter.Handle {
 		}
 
 		if middlewarePermission {
-			method.Call([]reflect.Value{})	
+			method.Call([]reflect.Value{})
 		}
 
 		if ctr.IsError() {
@@ -383,14 +387,13 @@ func (man *Manager) HandleDirect(params ...string) httprouter.Handle {
 	case 2:
 		ctrName = params[0]
 		mtdName = params[1]
-		
-	
+
 	default:
 		log.Fatal("Manager HandleDirect: wrong parameter count!")
 
 	}
 
-	log.Printf("Manager HandleDirect: preparing: %v %v ", mtdName)
+	log.Printf("Manager HandleDirect: preparing: %v", mtdName)
 
 	typ, isOk := man.controllersReflected[ctrName]
 	if !isOk {
@@ -413,7 +416,6 @@ func (man *Manager) HandleDirect(params ...string) httprouter.Handle {
 			reflect.ValueOf(ps),
 		}
 
-
 		log.Printf("%T HandleDirect: method[%v]", ctr, mtdName)
 
 		ctr.SetReqData(r, ps)
@@ -421,7 +423,7 @@ func (man *Manager) HandleDirect(params ...string) httprouter.Handle {
 		ctr.SetManager(man)
 
 		dbh, err := ctr.SetupDB(man.Dbc)
-		
+
 		if err != nil {
 			log.Print(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -446,7 +448,7 @@ func (man *Manager) HandleDirect(params ...string) httprouter.Handle {
 		}
 
 		if middlewarePermission {
-			method.Call(input)	
+			method.Call(input)
 		}
 
 		if ctr.IsError() {
@@ -454,20 +456,35 @@ func (man *Manager) HandleDirect(params ...string) httprouter.Handle {
 			log.Print(ctr.GetError().Msg)
 			log.Print(ctr.GetError().Err)
 			http.Error(w, ctr.GetError().Msg, ctr.GetError().Code)
-		} 
+		}
 
 	}
 }
 
 func FileDirExists(path string) (bool, error) {
-    _, err := os.Stat(path)
-    if err == nil {
-    	return true, nil 
-    }
-    
-    if os.IsNotExist(err) {
-    	return false, nil 
-    }
-    
-    return true, err
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	}
+
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+
+	return true, err
+}
+
+func (man *Manager) CronLoop() {
+	for {
+		for taskIndex, _ := range man.CronTasks {
+			if man.CronTasks[taskIndex].CheckTime() {
+				err := man.CronTasks[taskIndex].RunMethod(man)
+				if err != nil {
+					log.Printf("Error from Cron Task: %v\n", err)
+				}
+			}
+		}
+		time.Sleep(5 * time.Second)
+	}
+
 }

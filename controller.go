@@ -8,13 +8,13 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
-	"time"
 	"strconv"
+	"time"
+
 	"github.com/astaxie/beego/session"
 	"github.com/iancoleman/strcase"
 	"github.com/jinzhu/gorm"
 	"github.com/julienschmidt/httprouter"
-
 )
 
 type Controlled interface {
@@ -49,16 +49,15 @@ type Controlled interface {
 }
 
 type File interface {
-	IsTemporary()				bool
-	MoveTemp(...string)			error
+	IsTemporary() bool
+	MoveTemp(...string) error
 	Reset()
 }
 
-
 type Auth struct {
-	IsIn     	bool
-	Username 	string
-	Guid		string
+	IsIn     bool
+	Username string
+	Guid     string
 }
 
 type StatusError struct {
@@ -84,8 +83,8 @@ type Controller struct {
 	Man *Manager
 }
 
-func (ctr *Controller) SetRoutes()  {}
-func (ctr *Controller) PrepareMiddlewares()  {}
+func (ctr *Controller) SetRoutes()          {}
+func (ctr *Controller) PrepareMiddlewares() {}
 func (ctr *Controller) GetPaginator() *Paginator {
 	return NewPaginator(ctr)
 }
@@ -127,7 +126,6 @@ func (ctr *Controller) Handle(options ...string) httprouter.Handle {
 	options = append([]string{ctr.Name}, options...)
 	return ctr.Man.Handle(options...)
 }
-
 
 func (ctr *Controller) GetMiddleware(middleware Middleware, params ...string) *MidMethodSet {
 	return ctr.Man.Mid.GetSet(middleware, params...)
@@ -187,8 +185,8 @@ func (ctr *Controller) StartSession(s *session.Manager, w http.ResponseWriter, r
 
 	username := ctr.Session.Get("username")
 	switch username := username.(type) {
-		case string:
-			ctr.Auth.Username = username
+	case string:
+		ctr.Auth.Username = username
 	}
 
 	ctr.Req.SetCtQuick(ctr.Auth)
@@ -422,17 +420,16 @@ func (ctr *Controller) LookForFileponds(model interface{}, file File, params ...
 			}
 
 			ctr.Db.Save(file)
-			
 
 			if err != nil {
 				err = fmt.Errorf("BaseController LookForFileponds: moving TempFile error: %w", err)
 				return fParsed, err
 			}
 			fParsed++
-			
+
 		}
 	}
-	
+
 	return
 }
 
@@ -456,7 +453,7 @@ func (ctr *Controller) AuthGetUser(model interface{}, preload ...string) error {
 		return fmt.Errorf("Controller AuthGetUser getting user (%s) failed: \n%v", ctr.Auth.Username, preloadErr)
 	}
 
-	return nil 	
+	return nil
 }
 
 // AppendAuthUser tries to find logged in user and load it to user pointing struct
@@ -496,8 +493,8 @@ func (ctr *Controller) CallClient(name string, path string, params url.Values, r
 }
 
 func (ctr *Controller) VerifyApiKey() bool {
-	
-	if ctr.Man.Config.ApiKey == nil {	
+
+	if ctr.Man.Config.ApiKey == nil {
 		return false
 	}
 
@@ -510,4 +507,12 @@ func (ctr *Controller) QuickSendMessage(text string) error {
 	}
 
 	return ctr.Man.Messaging.QuickSend(text)
+}
+
+func (ctr *Controller) SendMessage(msg Message) error {
+	if ctr.Man.Messaging == nil {
+		return fmt.Errorf("QuickSendMessage failed: no messenger configured.")
+	}
+
+	return ctr.Man.Messaging.Send(msg)
 }

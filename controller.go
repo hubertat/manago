@@ -35,6 +35,7 @@ type Controlled interface {
 	SetManager(*Manager)
 	SetRouter(*httprouter.Router)
 	SetReqData(*http.Request, httprouter.Params)
+	SetEmptyReq()
 	Ctnt() *map[string]interface{}
 	JsonCtnt() ([]byte, error)
 	GetRedir() (bool, string)
@@ -91,6 +92,10 @@ func (ctr *Controller) GetPaginator() *Paginator {
 
 func (ctr *Controller) SetReqData(r *http.Request, ps httprouter.Params) {
 	ctr.Req.SetData(r, ps)
+}
+
+func (ctr *Controller) SetEmptyReq() {
+	ctr.Req.SetData(nil, httprouter.Params{})
 }
 
 func (ctr *Controller) Ctnt() *map[string]interface{} {

@@ -87,6 +87,7 @@ func (cr *Cron) RunMethod(man *Manager) error {
 
 	method := reflect.ValueOf(ctr).MethodByName(cr.MethodName)
 	ctr.SetManager(man)
+	ctr.SetEmptyReq()
 	dbh, err := ctr.SetupDB(man.Dbc)
 
 	if err != nil {
@@ -95,6 +96,6 @@ func (cr *Cron) RunMethod(man *Manager) error {
 	defer dbh.Close()
 
 	log.Printf("##Cron RunMethod passed, running %s from controller %s.\n", cr.MethodName, cr.ControllerName)
-	method.Call([]reflect.Value{})
+	go method.Call([]reflect.Value{})
 	return nil
 }

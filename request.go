@@ -2,13 +2,14 @@ package manago
 
 import (
 	"fmt"
-	"github.com/julienschmidt/httprouter"
+	"log"
+	"net/http"
 	"reflect"
 	"strconv"
-	"time"
-	"net/http"
 	"strings"
-	"log"
+	"time"
+
+	"github.com/julienschmidt/httprouter"
 )
 
 type Request struct {
@@ -22,12 +23,14 @@ type Request struct {
 }
 
 func (req *Request) SetData(r *http.Request, ps httprouter.Params) {
-	
+
 	req.ViewContent = make(map[string]interface{})
-	req.R = r
 	req.params = ps
 
-	req.R.ParseForm()
+	if r != nil {
+		req.R = r
+		req.R.ParseForm()
+	}
 
 	id, err := strconv.ParseUint(ps.ByName("id"), 10, 32)
 	if err == nil && id > 0 {

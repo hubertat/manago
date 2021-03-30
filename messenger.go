@@ -1,52 +1,52 @@
 package manago
 
 import (
-	"fmt"
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
-	"bytes"
 	"time"
 )
-type Messenger	interface {
-	Send(Message) 		error
-	QuickSend(string)	error
+
+type Messenger interface {
+	Send(Message) error
+	QuickSend(string) error
 }
 
 type Slack struct {
-	HookUrl		string
-	
+	HookUrl string
 }
 
 type Message struct {
-	Topic		string
-	Body		string
-	LinkUrl		*string
-	LinkText	*string
+	Topic    string
+	Body     string
+	LinkUrl  *string
+	LinkText *string
 }
 
 func (ms *Message) GetSlackMessage() ([]byte, error) {
 
 	type SlackText struct {
-		Type	string	`json:"type,omitempty"`
-		Text	string	`json:"text"`
-		Emoji	bool	`json:"emoji,omitempty"`
+		Type  string `json:"type,omitempty"`
+		Text  string `json:"text"`
+		Emoji bool   `json:"emoji,omitempty"`
 	}
 	type SlackAccessory struct {
-		Type	string	`json:"type,omitempty"`
-		Text	*SlackText	`json:"text,omitempty"`
-		Value	string	`json:"value,omitempty"`
-		Url		string	`json:"url,omitempty"`
-		ActionId	string	`json:"action_id,omitempty"`
+		Type     string     `json:"type,omitempty"`
+		Text     *SlackText `json:"text,omitempty"`
+		Value    string     `json:"value,omitempty"`
+		Url      string     `json:"url,omitempty"`
+		ActionId string     `json:"action_id,omitempty"`
 	}
 
 	type SlackBlock struct {
-		Type	string 			`json:"type"`
-		Text	*SlackText 		`json:"text,omitempty"`
-		Accessory *SlackAccessory	`json:"accessory,omitempty"`
+		Type      string          `json:"type"`
+		Text      *SlackText      `json:"text,omitempty"`
+		Accessory *SlackAccessory `json:"accessory,omitempty"`
 	}
 	type SlackMessage struct {
-		Blocks		[]SlackBlock	`json:"blocks,omitempty"`
+		Blocks []SlackBlock `json:"blocks,omitempty"`
 	}
 
 	msg := SlackMessage{}
@@ -62,10 +62,9 @@ func (ms *Message) GetSlackMessage() ([]byte, error) {
 	if len(ms.Body) > 0 {
 		bodyBlock := &SlackText{Type: "plain_text", Text: ms.Body, Emoji: true}
 		msg.Blocks = append(msg.Blocks, SlackBlock{Type: "section", Text: bodyBlock})
-		
+
 	}
-	
-	
+
 	return json.Marshal(msg)
 }
 
@@ -79,7 +78,7 @@ func (sl *Slack) Send(msg Message) error {
 	if err != nil {
 		return fmt.Errorf("Parsing message to json failed: %v\n", err)
 	}
-	fmt.Printf("%s/n/n",jsonMsg)
+
 	request, err := http.NewRequest("POST", reqUrl.String(), bytes.NewBuffer(jsonMsg))
 	if err != nil {
 		return fmt.Errorf("Preparing request failed: %v", err)
@@ -101,13 +100,11 @@ func (sl *Slack) Send(msg Message) error {
 		return fmt.Errorf("Received non success response: %s", resp.Status)
 	}
 
-	
-
 	// decode := json.NewDecoder(resp.Body)
 	// err = decode.Decode(em.LastState)
 	// if err != nil {
 	// 	return fmt.Errorf("Decoding json failed: %v", err)
-	// } 
+	// }
 
 	return nil
 }

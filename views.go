@@ -8,19 +8,15 @@ import (
 	"net/http"
 	"strings"
 	"time"
-	// "embed"
 )
 
 type ViewSet struct {
 	templatesLocation string
 	partialsLocation  string
 	ts                map[string]*template.Template
-	baseTemplate	*template.Template
-	man				*Manager			
+	baseTemplate      *template.Template
+	man               *Manager
 }
-
-
-// var staticEmbeded embed.FS
 
 func (vs *ViewSet) Load(conf *Config, manager *Manager) (err error) {
 	vs.man = manager
@@ -33,8 +29,6 @@ func (vs *ViewSet) Load(conf *Config, manager *Manager) (err error) {
 
 	vs.templatesLocation = strings.Trim(conf.TemplatesPath, "\\/.")
 	vs.partialsLocation = "/partials"
-
-	
 
 	err = fs.WalkDir(manager.StaticFsys, vs.templatesLocation, vs.walkForBase)
 	if err != nil {
@@ -61,7 +55,6 @@ func (vs *ViewSet) walkFolders(path string, d fs.DirEntry, err error) error {
 		name = strings.Trim(name, "\\/.")
 		log.Printf("walkFolders found template file: %s and saving as: %s", d.Name(), name)
 
-		
 		t, tempErr := vs.baseTemplate.Clone()
 		if tempErr != nil {
 			return fmt.Errorf("walkFolders error when cloning template: %v\n", tempErr)
@@ -81,7 +74,7 @@ func (vs *ViewSet) walkForBase(path string, d fs.DirEntry, err error) error {
 	}
 
 	if !d.IsDir() {
-		if strings.Contains(strings.ToLower(d.Name()), ".gohtml") || (strings.Contains(path, vs.partialsLocation) && strings.Contains(strings.ToLower(d.Name()), ".html") ) {
+		if strings.Contains(strings.ToLower(d.Name()), ".gohtml") || (strings.Contains(path, vs.partialsLocation) && strings.Contains(strings.ToLower(d.Name()), ".html")) {
 			name := strings.ToLower(d.Name())
 			log.Printf("Found and parsing %s as %s", path, name)
 
@@ -89,13 +82,14 @@ func (vs *ViewSet) walkForBase(path string, d fs.DirEntry, err error) error {
 
 			if vs.baseTemplate == nil {
 				vs.baseTemplate, tempErr = template.New("zero").Funcs(template.FuncMap{
-					"isNot":   tFuncIsNot,
-					"tSimple": tTime,
-					"tDate":   tDate,
-					"sLimit":  tLimitString,
-					"tFindInput":  tFindInput,
+					"isNot":        tFuncIsNot,
+					"tSimple":      tTime,
+					"tDate":        tDate,
+					"sLimit":       tLimitString,
+					"tFindInput":   tFindInput,
 					"uintToString": uintToString,
-					"sLimitVar":	tLimitStringVar,
+					"sLimitVar":    tLimitStringVar,
+					"extractHrefs": ExtractHrefs,
 				}).ParseFS(vs.man.StaticFsys, path)
 			} else {
 				vs.baseTemplate, tempErr = vs.baseTemplate.ParseFS(vs.man.StaticFsys, path)
@@ -105,7 +99,7 @@ func (vs *ViewSet) walkForBase(path string, d fs.DirEntry, err error) error {
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -177,13 +171,13 @@ func tFindInput(s ...string) (output map[string]string) {
 	if len(s) < 3 {
 		return
 	}
-	
+
 	output["Title"] = s[0]
 	output["ModelName"] = s[1]
 	output["FindPost"] = s[2]
-	
+
 	if len(s) < 4 {
-		return 
+		return
 	}
 
 	output["FindFields"] = s[3]
@@ -195,10 +189,32 @@ func tFindInput(s ...string) (output map[string]string) {
 	output["SelectedOption"] = "true"
 	output["SelectedVal"] = s[4]
 	output["SelectedName"] = s[5]
-	
+
 	return
 }
 
 func uintToString(val uint) string {
 	return fmt.Sprintf("%d", val)
+}
+func ExtractHrefs(input string) (hrefs []string) {
+	prefixes := []string{"https://", "http://"}
+	endPosition := 0
+
+	for _, prefix := range prefixes {
+		description := strings.ToLower(input)
+
+		for where := strings.Index(description, prefix); where > -1; where = strings.Index(description, prefix) {
+			endPosition = strings.IndexAny(description[where:], ` "';`)
+			if endPosition > 0 {
+				hrefs = append(hrefs, description[where:where+endPosition])
+				description = description[where+endPosition:]
+			} else {
+				hrefs = append(hrefs, description[where:])
+				description = ""
+			}
+
+		}
+	}
+
+	return
 }

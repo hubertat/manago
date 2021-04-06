@@ -384,6 +384,7 @@ func (ctr *Controller) LookForFileponds(model interface{}, file File, params ...
 	if len(params) == 0 {
 		pathName = strcase.ToSnake(modelName)
 	} else {
+		pathName = params[0]
 		nestedPath = true
 	}
 

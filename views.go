@@ -201,9 +201,9 @@ func ExtractHrefs(input string) (hrefs []string) {
 	endPosition := 0
 
 	for _, prefix := range prefixes {
-		description := strings.ToLower(input)
+		description := input
 
-		for where := strings.Index(description, prefix); where > -1; where = strings.Index(description, prefix) {
+		for where := strings.Index(strings.ToLower(description), prefix); where > -1; where = strings.Index(strings.ToLower(description), prefix) {
 			endPosition = strings.IndexAny(description[where:], ` "';`)
 			if endPosition > 0 {
 				hrefs = append(hrefs, description[where:where+endPosition])

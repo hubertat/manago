@@ -90,12 +90,13 @@ func (vs *ViewSet) walkForBase(path string, d fs.DirEntry, err error) error {
 					"uintToString": uintToString,
 					"sLimitVar":    tLimitStringVar,
 					"extractHrefs": ExtractHrefs,
+					"tSince":       tPrettySince,
 				}).ParseFS(vs.man.StaticFsys, path)
 			} else {
 				vs.baseTemplate, tempErr = vs.baseTemplate.ParseFS(vs.man.StaticFsys, path)
 			}
 			if tempErr != nil {
-				return fmt.Errorf("walkForBase error from parsing template: %v\n", tempErr)
+				return fmt.Errorf("walkForBase error from parsing template: %v", tempErr)
 			}
 		}
 	}
@@ -217,4 +218,17 @@ func ExtractHrefs(input string) (hrefs []string) {
 	}
 
 	return
+}
+
+func tPrettySince(from time.Time) string {
+	duration := time.Since(from)
+	if duration < time.Hour {
+		return fmt.Sprintf("%d minut temu", int(duration.Minutes()))
+	}
+
+	if duration < 24*time.Hour {
+		return fmt.Sprintf("%.1f godzin temu", duration.Hours())
+	}
+
+	return fmt.Sprintf("%d dni temu", int(duration.Hours()/24))
 }

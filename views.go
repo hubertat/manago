@@ -200,12 +200,14 @@ func uintToString(val uint) string {
 func ExtractHrefs(input string) (hrefs []string) {
 	prefixes := []string{"https://", "http://"}
 	endPosition := 0
+	delimeters := ` "';
+	`
 
 	for _, prefix := range prefixes {
 		description := input
 
 		for where := strings.Index(strings.ToLower(description), prefix); where > -1; where = strings.Index(strings.ToLower(description), prefix) {
-			endPosition = strings.IndexAny(description[where:], ` "';`)
+			endPosition = strings.IndexAny(description[where:], delimeters)
 			if endPosition > 0 {
 				hrefs = append(hrefs, description[where:where+endPosition])
 				description = description[where+endPosition:]

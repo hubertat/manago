@@ -3,6 +3,7 @@ package manago
 import (
 	"encoding/json"
 	"fmt"
+
 	// "os"
 	"io/ioutil"
 )
@@ -34,29 +35,31 @@ type AuthGroup struct {
 }
 
 type Config struct {
-	Server 	ServerConfig
-	Db     	DatabaseConfig
-	DbAlt	*DatabaseConfig		`json:"db_alt,omitempty"`
+	Server ServerConfig
+	Db     DatabaseConfig
+	DbAlt  *DatabaseConfig `json:"db_alt,omitempty"`
 
 	StoragePaths []FilePath
 	MappedPaths  map[string]*FilePath
 	DefaultPath  string
 	TmpPath      string
 
-	TemplatesPath 	string
-	StaticPath		string
-	WebStaticPath	string
-	ForceLiveStatic	bool
+	TemplatesPath   string
+	StaticPath      string
+	WebStaticPath   string
+	ForceLiveStatic bool
 
 	AuthGroups []AuthGroup
 	MappedAuth map[string]*AuthGroup
 
-	DevSkipMiddleware	bool
+	DevSkipMiddleware bool
 
-	ApiKey			*string
-	Clients			map[string]Client
+	ApiKey  *string
+	Clients map[string]Client
 
-	SlackHook		*string	`json:",omitempty"`
+	SlackHook *string `json:",omitempty"`
+
+	AppVariables map[string]string
 }
 
 func (c *Config) Load(input string) (err error) {

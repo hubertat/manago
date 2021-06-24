@@ -1,4 +1,4 @@
-module github.com/hubertat/manago
+module manago
 
 go 1.16
 

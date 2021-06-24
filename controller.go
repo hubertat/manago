@@ -14,40 +14,7 @@ import (
 	"github.com/astaxie/beego/session"
 	"github.com/iancoleman/strcase"
 	"github.com/jinzhu/gorm"
-	"github.com/julienschmidt/httprouter"
 )
-
-type Controlled interface {
-	SetRoutes()
-	PrepareMiddlewares()
-	GetMiddleware(Middleware, ...string) *MidMethodSet
-	SetMiddleware(*MidMethodSet, ...string) error
-	SetMiddlewareDirect(Middleware, ...string) error
-	SetMiddlewareParams(Middleware, map[string]string, ...string) error
-	Handle(...string) httprouter.Handle
-	SetupDB(*Db) (*gorm.DB, error)
-	StartSession(*session.Manager, http.ResponseWriter, *http.Request) error
-	SessionRelease(http.ResponseWriter)
-	IsError() bool
-	GetError() StatusError
-	SetError(int, error, ...string)
-	ClearError()
-	SetManager(*Manager)
-	SetRouter(*httprouter.Router)
-	SetReqData(*http.Request, httprouter.Params)
-	SetEmptyReq()
-	Ctnt() *map[string]interface{}
-	JsonCtnt() ([]byte, error)
-	GetRedir() (bool, string)
-	SetRedir(string)
-	AuthGetUser(interface{}, ...string) error
-	FirstPreload(interface{}, uint, ...string) error
-	GetModel(interface{}, ...string) error
-	GetAltDbConfig() *DatabaseConfig
-	CallClient(string, string, url.Values, interface{}) error
-	VerifyApiKey() bool
-	QuickSendMessage(string) error
-}
 
 type File interface {
 	IsTemporary() bool
@@ -68,12 +35,6 @@ type StatusError struct {
 }
 
 type Controller struct {
-	// controller definition data
-	Name        string
-	modelObject interface{}
-
-	Router *httprouter.Router
-
 	// session specific data
 	Session session.Store
 	Auth    Auth
@@ -84,18 +45,8 @@ type Controller struct {
 	Man *Manager
 }
 
-func (ctr *Controller) SetRoutes()          {}
-func (ctr *Controller) PrepareMiddlewares() {}
 func (ctr *Controller) GetPaginator() *Paginator {
 	return NewPaginator(ctr)
-}
-
-func (ctr *Controller) SetReqData(r *http.Request, ps httprouter.Params) {
-	ctr.Req.SetData(r, ps)
-}
-
-func (ctr *Controller) SetEmptyReq() {
-	ctr.Req.SetData(nil, httprouter.Params{})
 }
 
 func (ctr *Controller) Ctnt() *map[string]interface{} {
@@ -118,20 +69,6 @@ func (ctr *Controller) SetRedir(input string) {
 	ctr.Req.SetRedir(input)
 }
 
-func (ctr *Controller) HandleJson(mtdName string) httprouter.Handle {
-	return ctr.Man.HandleJson(ctr.Name, mtdName)
-}
-
-func (ctr *Controller) HandleDirect(mtdName string) httprouter.Handle {
-	return ctr.Man.HandleDirect(ctr.Name, mtdName)
-}
-
-func (ctr *Controller) Handle(options ...string) httprouter.Handle {
-
-	options = append([]string{ctr.Name}, options...)
-	return ctr.Man.Handle(options...)
-}
-
 func (ctr *Controller) GetMiddleware(middleware Middleware, params ...string) *MidMethodSet {
 	return ctr.Man.Mid.GetSet(middleware, params...)
 }
@@ -147,11 +84,6 @@ func (ctr *Controller) SetMiddlewareDirect(mid Middleware, methods ...string) er
 	return ctr.Man.Mid.ControllerSetRaw(ctr.Name, mid, params, methods...)
 }
 
-// func (ctr *Controller) File(options  ...string) httprouter.Handle {
-// 	options = append([]string{ctr.Name}, options...)
-// 	return Fire(options...)
-// }
-
 func (ctr *Controller) SetManager(man *Manager) {
 	ctr.Man = man
 }
@@ -165,10 +97,6 @@ func (ctr *Controller) SetupDB(dbc *Db) (*gorm.DB, error) {
 	ctr.Db = ctr.Db.Set("gorm:auto_preload", false)
 
 	return ctr.Db, err
-}
-
-func (ctr *Controller) SetRouter(r *httprouter.Router) {
-	ctr.Router = r
 }
 
 func (ctr *Controller) StartSession(s *session.Manager, w http.ResponseWriter, r *http.Request) error {
@@ -372,7 +300,7 @@ func (ctr *Controller) LookForFileponds(model interface{}, file File, params ...
 		err = fmt.Errorf("Expected file as pointer! Received non-pointer type.")
 		return
 	}
-	// fType := reflect.Indirect(reflect.ValueOf(file)).Type()
+
 	kind := reflect.ValueOf(model).Type().Kind().String()
 	if kind != "ptr" {
 		err = fmt.Errorf("Expected pointer model input! Received non-pointer type.")

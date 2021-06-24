@@ -488,3 +488,81 @@ func (man *Manager) CronLoop() {
 	}
 
 }
+
+type ManagoHandlerFunc func(ctr *Controller) (err error)
+
+type Manageable interface {
+	SetRoutes(*Manager)
+	SetMiddleware(*Manager)
+}
+
+func (man *Manager) GET(path string, handle ManagoHandlerFunc) {
+	man.AddRoute("GET", path, handle)
+}
+
+func (man *Manager) POST(path string, handle ManagoHandlerFunc) {
+	man.AddRoute("POST", path, handle)
+}
+
+func (man *Manager) AddRoute(method string, path string, handle ManagoHandlerFunc) {
+	man.router.Handle(method, path, man.handleWrapper(handle))
+}
+
+func (man *Manager) handleWrapper(handlerFunc ManagoHandlerFunc) (handle httprouter.Handle) {
+	var templateName string
+	return func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+		ctr := Controller{}
+
+		ctr.Req.SetData(r, ps)
+
+		ctr.SetManager(man)
+
+		dbh, err := ctr.SetupDB(man.Dbc)
+
+		if err != nil {
+			log.Print(err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer dbh.Close()
+
+		err = ctr.StartSession(man.sessionManager, w, r)
+		defer ctr.SessionRelease(w)
+		if err != nil {
+			log.Print(err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		var middlewarePermission bool
+
+		if man.Config.DevSkipMiddleware && man.AppVersion == "v_dev" {
+			middlewarePermission = true
+		} else {
+			middlewarePermission = man.Mid.ctrRunBefore(ctrName, mtdName, ctr)
+		}
+
+		var errFromHandler error
+		if middlewarePermission {
+			errFromHandler = handlerFunc(&ctr)
+		}
+
+		if errFromHandler != nil {
+			errCode := ctr.GetError().Code
+			if errCode == 0 {
+				errCode = 500
+			}
+			http.Error(w, errFromHandler.Error(), errCode)
+		} else {
+			redirS, redirAddrS := ctr.GetRedir()
+			if redirS {
+				http.Redirect(w, r, redirAddrS, 303)
+			} else {
+				err := man.Views.FireTemplate(templateName, w, ctr.Ctnt())
+				if err != nil {
+					log.Print(err.Error())
+				}
+			}
+		}
+	}
+}

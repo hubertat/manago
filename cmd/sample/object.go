@@ -2,6 +2,7 @@ package main
 
 import (
 	"manago"
+	"manago/cmd/sample/middleware"
 
 	"github.com/jinzhu/gorm"
 )
@@ -18,8 +19,10 @@ type Object struct {
 }
 
 func (ob *Object) SetRoutes(man *manago.Manager) {
-	man.AddRoute("GET", "/object/list", ob.List)
-	man.AddRoute(ob.List, "GET", "/object/list", "object/list.html")
+	inTechGroup := middleware.NewInGroupMiddleware("dzial_tech", "wp_admin")
+
+	man.GET("/object/list", ob.List, &inTechGroup)
+	man.AddRoute("GET", "/object/list", ob.List, &inTechGroup)
 }
 
 func (ob *Object) SetMiddleware(man *manago.Manager) {

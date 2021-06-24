@@ -7,8 +7,8 @@ import (
 )
 
 type Middleware interface {
-	RunBefore(ManagoHandlerFunc, map[string]string) bool
-	RunAfter(ManagoHandlerFunc, map[string]string)
+	RunBefore(*Controller) bool
+	RunAfter(*Controller)
 }
 
 type MidMethodSet struct {

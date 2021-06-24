@@ -496,19 +496,19 @@ type Manageable interface {
 	SetMiddleware(*Manager)
 }
 
-func (man *Manager) GET(path string, handle ManagoHandlerFunc) {
-	man.AddRoute("GET", path, handle)
+func (man *Manager) GET(path string, handle ManagoHandlerFunc, middlewares ...Middleware) {
+	man.AddRoute("GET", path, handle, middlewares...)
 }
 
-func (man *Manager) POST(path string, handle ManagoHandlerFunc) {
-	man.AddRoute("POST", path, handle)
+func (man *Manager) POST(path string, handle ManagoHandlerFunc, middlewares ...Middleware) {
+	man.AddRoute("POST", path, handle, middlewares...)
 }
 
-func (man *Manager) AddRoute(method string, path string, handle ManagoHandlerFunc) {
-	man.router.Handle(method, path, man.handleWrapper(handle))
+func (man *Manager) AddRoute(method string, path string, handle ManagoHandlerFunc, middlewares ...Middleware) {
+	man.router.Handle(method, path, man.handleWrapper(handle, middlewares...))
 }
 
-func (man *Manager) handleWrapper(handlerFunc ManagoHandlerFunc) (handle httprouter.Handle) {
+func (man *Manager) handleWrapper(handlerFunc ManagoHandlerFunc, middlewares ...Middleware) (handle httprouter.Handle) {
 	var templateName string
 	return func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 		ctr := Controller{}
@@ -535,6 +535,11 @@ func (man *Manager) handleWrapper(handlerFunc ManagoHandlerFunc) (handle httprou
 		}
 
 		var middlewarePermission bool
+		for _, midWare := range middlewares {
+			if midWare.RunBefore(&ctr) {
+				middlewarePermission = true
+			}
+		}
 
 		if man.Config.DevSkipMiddleware && man.AppVersion == "v_dev" {
 			middlewarePermission = true

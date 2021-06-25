@@ -2,11 +2,11 @@ package manago
 
 import (
 	"fmt"
+
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/mssql"
 	_ "github.com/jinzhu/gorm/dialects/postgres"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
-	"reflect"
 )
 
 type Db struct {
@@ -33,7 +33,7 @@ func (dbc *Db) Open() (db *gorm.DB, err error) {
 
 	case "mssql":
 		// db, err = gorm.Open("mssql", fmt.Sprintf("sqlserver://%s:%s@%s:%d?database=%s", dbc.config.User, dbc.config.Pass, dbc.config.Host, dbc.config.Port, dbc.config.Name))
-		db, err = gorm.Open("mssql", fmt.Sprintf("server=%s;user id=%s;password=%s;port=%d;database=%s", 
+		db, err = gorm.Open("mssql", fmt.Sprintf("server=%s;user id=%s;password=%s;port=%d;database=%s",
 			dbc.config.Host, dbc.config.User, dbc.config.Pass, dbc.config.Port, dbc.config.Name))
 
 	default:
@@ -49,19 +49,21 @@ func (dbc *Db) Close() {
 	dbc.DB.Close()
 }
 
-func (dbc *Db) AutoMigrate(modelsReflected map[string]reflect.Type) (err error) {
+func (dbc *Db) AutoMigrate(toManage []Manageable) (err error) {
 
 	db, err := dbc.Open()
-	
+
 	if err != nil {
 		return fmt.Errorf("models AutoMigrate failed: %w", err)
 	}
 	defer db.Close()
 
-	for _, v := range modelsReflected {
-		model := reflect.New(v).Interface()
-		fmt.Printf("Migrating model: %v\n", v)
-		db.AutoMigrate(model)
+	for _, typ := range toManage {
+		model := typ.MigrateDbModel()
+		if model != nil {
+			fmt.Printf("Migrating model: %v\n", model)
+			db.AutoMigrate(model)
+		}
 	}
 
 	return

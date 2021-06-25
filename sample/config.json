@@ -1,0 +1,18 @@
+{
+	"server": {
+		"port": 7610
+	},
+	"db": {
+		"server": "sqlite",
+		"sqlitepath": "./sqlite/db"
+	},
+	"tmpPath": "./tmp/",
+	"defaultPath": "./files/",
+
+	"storagePaths": [
+		{
+			"path": "./files/object/",
+			"modelName": "object"
+		}
+	]
+}

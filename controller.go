@@ -69,21 +69,6 @@ func (ctr *Controller) SetRedir(input string) {
 	ctr.Req.SetRedir(input)
 }
 
-func (ctr *Controller) GetMiddleware(middleware Middleware, params ...string) *MidMethodSet {
-	return ctr.Man.Mid.GetSet(middleware, params...)
-}
-func (ctr *Controller) SetMiddleware(mms *MidMethodSet, methods ...string) error {
-	return ctr.Man.Mid.ControllerSet(ctr.Name, mms, methods...)
-}
-func (ctr *Controller) SetMiddlewareParams(mid Middleware, params map[string]string, methods ...string) error {
-	return ctr.Man.Mid.ControllerSetRaw(ctr.Name, mid, params, methods...)
-}
-
-func (ctr *Controller) SetMiddlewareDirect(mid Middleware, methods ...string) error {
-	params := make(map[string]string)
-	return ctr.Man.Mid.ControllerSetRaw(ctr.Name, mid, params, methods...)
-}
-
 func (ctr *Controller) SetManager(man *Manager) {
 	ctr.Man = man
 }

@@ -4,42 +4,35 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"time"
 )
 
-type ViewSet struct {
-	man *Manager
-}
-
-func (vs *ViewSet) Load(conf *Config, manager *Manager) (err error) {
-	vs.man = manager
-
-	if manager.StaticFsys == nil {
-		err = fmt.Errorf("no static FS! Aborting")
-		return
+func (man *Manager) FireTemplate(w http.ResponseWriter, ctnt *map[string]interface{}, path string) error {
+	names := []string{}
+	names = append(names, fmt.Sprintf("%s.html", strings.TrimLeft(path, `\/`)))
+	names = append(names, fmt.Sprintf("%s.htm", strings.TrimLeft(path, `\/`)))
+	names = append(names, "default.html")
+	var err error
+	for _, name := range names {
+		tpl, err := template.ParseFS(man.StaticFsys, filepath.Join("templates", name))
+		if err == nil {
+			return tpl.Funcs(template.FuncMap{
+				"isNot":        tFuncIsNot,
+				"tSimple":      tTime,
+				"tDate":        tDate,
+				"sLimit":       tLimitString,
+				"tFindInput":   tFindInput,
+				"uintToString": uintToString,
+				"sLimitVar":    tLimitStringVar,
+				"extractHrefs": ExtractHrefs,
+				"tSince":       tPrettySince,
+			}).ExecuteTemplate(w, "base.gohtml", *ctnt)
+		}
 	}
 
-	return
-}
-
-func (vs *ViewSet) FireTemplate(name string, w http.ResponseWriter, ctnt *map[string]interface{}) (err error) {
-	tpl, err := template.ParseFS(vs.man.StaticFsys, strings.Join([]string{"templates", name}, "/"))
-	if err != nil {
-		return
-	}
-	return tpl.Funcs(template.FuncMap{
-		"isNot":        tFuncIsNot,
-		"tSimple":      tTime,
-		"tDate":        tDate,
-		"sLimit":       tLimitString,
-		"tFindInput":   tFindInput,
-		"uintToString": uintToString,
-		"sLimitVar":    tLimitStringVar,
-		"extractHrefs": ExtractHrefs,
-		"tSince":       tPrettySince,
-	}).ExecuteTemplate(w, "base.gohtml", *ctnt)
-
+	return err
 }
 
 func tFuncIsNot(val interface{}) (ret bool) {

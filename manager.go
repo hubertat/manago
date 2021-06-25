@@ -6,12 +6,9 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"reflect"
-	"strings"
 	"time"
 
 	"github.com/astaxie/beego/session"
-	"github.com/iancoleman/strcase"
 	"github.com/julienschmidt/httprouter"
 )
 
@@ -19,13 +16,10 @@ type Manager struct {
 	sessionManager *session.Manager
 	router         *httprouter.Router
 
-	controllersReflected map[string]reflect.Type
-	modelsReflected      map[string]reflect.Type
+	toManage []Manageable
 
 	Config     Config
-	Views      *ViewSet
 	Dbc        *Db
-	Mid        *MiddlewareManager
 	Clients    map[string]Client
 	StaticFsys fs.FS
 	Messaging  Messenger
@@ -35,15 +29,16 @@ type Manager struct {
 	AppBuild   string
 }
 
-func New(conf Config, allCtrs []interface{}, allModels []interface{}, build ...string) (man *Manager, err error) {
+func New(conf Config, toManage []Manageable, build ...string) (man *Manager, err error) {
 	man = &Manager{
 		Config:     conf,
 		router:     httprouter.New(),
 		Dbc:        &Db{},
-		Views:      &ViewSet{},
 		Clients:    conf.Clients,
 		StaticFsys: os.DirFS("./static"),
 	}
+
+	man.toManage = toManage
 
 	if len(build) > 0 {
 		if len(build[0]) == 0 {
@@ -54,31 +49,6 @@ func New(conf Config, allCtrs []interface{}, allModels []interface{}, build ...s
 	}
 	if len(build) > 1 {
 		man.AppBuild = build[1]
-	}
-
-	man.controllersReflected = make(map[string]reflect.Type)
-
-	for _, ctr := range allCtrs {
-		typ := reflect.ValueOf(ctr).Type()
-		if typ.Kind().String() == "ptr" {
-			err = fmt.Errorf("ERROR Manager New: Found pointer in allControllers[], expecting struct.")
-			return
-		}
-		name := strcase.ToSnake(typ.Name())
-		man.controllersReflected[name] = typ
-	}
-	log.Print(man.controllersReflected)
-
-	man.modelsReflected = make(map[string]reflect.Type)
-
-	for _, m := range allModels {
-		typ := reflect.ValueOf(m).Type()
-		if typ.Kind().String() == "ptr" {
-			err = fmt.Errorf("ERROR Manager New: Found pointer in allModels[], expecting struct.")
-			return
-		}
-		name := strcase.ToSnake(typ.Name())
-		man.modelsReflected[name] = typ
 	}
 
 	sessConfig := &session.ManagerConfig{}
@@ -92,15 +62,7 @@ func New(conf Config, allCtrs []interface{}, allModels []interface{}, build ...s
 		return
 	}
 
-	man.Mid = NewMiddlewareManager()
 	man.MakeRoutes()
-	man.PrepareMiddlewares()
-
-	err = man.Views.Load(&conf, man)
-	if err != nil {
-		err = fmt.Errorf("ERROR Manager New: views set failed: %w", err)
-		return
-	}
 
 	err = man.Dbc.Check(man.Config.Db)
 	if err != nil {
@@ -128,12 +90,6 @@ func (man *Manager) ReloadStaticFS(fsys fs.FS) (err error) {
 		man.StaticFsys = fsys
 	}
 
-	err = man.Views.Load(&man.Config, man)
-	if err != nil {
-		err = fmt.Errorf("Manager Reloading static FS: views set failed: %w", err)
-		return
-	}
-
 	man.router = httprouter.New()
 	man.MakeRoutes()
 
@@ -141,7 +97,7 @@ func (man *Manager) ReloadStaticFS(fsys fs.FS) (err error) {
 }
 
 func (man *Manager) Migrate() error {
-	return man.Dbc.AutoMigrate(man.modelsReflected)
+	return man.Dbc.AutoMigrate(man.toManage)
 }
 
 func (man *Manager) Start() (status string) {
@@ -165,12 +121,9 @@ func (man *Manager) MakeRoutes() {
 
 	man.makeStaticRoutes()
 
-	for _, typ := range man.controllersReflected {
-		log.Printf("Manager MakeRoutes: preparing routes for %s", typ.Name())
-		ctr := reflect.New(typ).Interface().(Controlled)
-		ctr.SetManager(man)
-		ctr.SetRouter(man.router)
-		ctr.SetRoutes()
+	for _, typ := range man.toManage {
+		log.Printf("Manager MakeRoutes: preparing routes for %v", typ)
+		typ.SetRoutes(man)
 	}
 }
 
@@ -189,276 +142,6 @@ func (man *Manager) makeStaticRoutes() error {
 	man.router.ServeFiles("/static/*filepath", http.FS(staticFiles))
 
 	return nil
-}
-
-func (man *Manager) PrepareMiddlewares() {
-
-	for _, typ := range man.controllersReflected {
-		log.Printf("Manager PrepareMiddleware: preparing middleware for %s", typ.Name())
-		ctr := reflect.New(typ).Interface().(Controlled)
-		ctr.SetManager(man)
-		ctr.PrepareMiddlewares()
-	}
-}
-
-func (man *Manager) HandleJson(ctrName, mtdName string) httprouter.Handle {
-
-	log.Printf("Manager HandleJson: preparing: %s->%s", ctrName, mtdName)
-
-	typ, isOk := man.controllersReflected[ctrName]
-	if !isOk {
-		log.Fatalf("Manager HandleJson: controller [%s] not found!", ctrName)
-	}
-
-	if !reflect.New(typ).MethodByName(mtdName).IsValid() {
-		log.Fatalf("Manager HandleJson: method[%v] not found!", mtdName)
-	}
-
-	return func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-
-		ctr := reflect.New(typ).Interface().(Controlled)
-		method := reflect.ValueOf(ctr).MethodByName(mtdName)
-
-		log.Printf("%T HandleJson: method[%v]", ctr, mtdName)
-
-		ctr.SetReqData(r, ps)
-		ctr.SetManager(man)
-
-		dbh, err := ctr.SetupDB(man.Dbc)
-		if err != nil {
-			log.Print(err.Error())
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		defer dbh.Close()
-
-		err = ctr.StartSession(man.sessionManager, w, r)
-		defer ctr.SessionRelease(w)
-		if err != nil {
-			log.Print(err.Error())
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		var middlewarePermission bool
-
-		if man.Config.DevSkipMiddleware && man.AppVersion == "v_dev" {
-			middlewarePermission = true
-		} else {
-			middlewarePermission = man.Mid.ctrRunBefore(ctrName, mtdName, ctr)
-		}
-
-		if middlewarePermission {
-			method.Call([]reflect.Value{})
-		}
-
-		json, errJson := ctr.JsonCtnt()
-		if errJson != nil {
-			ctr.SetError(500, fmt.Errorf("HandleJson parsing to json failed:\n%v", errJson))
-		}
-
-		if ctr.IsError() {
-			log.Print("Error from controller detected, serving:")
-			log.Print(ctr.GetError().Msg)
-			log.Print(ctr.GetError().Err)
-			http.Error(w, ctr.GetError().Msg, ctr.GetError().Code)
-		} else {
-			w.Header().Set("Content-Type", "application/json")
-			w.Write(json)
-		}
-
-	}
-}
-
-func (man *Manager) Handle(params ...string) httprouter.Handle {
-	var redir bool
-	var ctrName, mtdName, tmplName, redirAddr string
-
-	switch len(params) {
-	case 4:
-		ctrName = params[0]
-		mtdName = params[1]
-		tmplName = params[2]
-		redirAddr = params[3]
-		redir = true
-
-	case 2:
-		ctrName = params[0]
-		mtdName = params[1]
-		tmplName = ctrName + "/" + strcase.ToSnake(mtdName)
-		redir = false
-
-	case 3:
-		ctrName = params[0]
-		mtdName = params[1]
-		tmplName = params[2]
-		redir = false
-
-		if strings.HasPrefix(tmplName, "./") {
-			tmplName = strings.Replace(tmplName, ".", ctrName, 1)
-		}
-
-	default:
-		log.Fatal("Manager Handle: wrong parameter count!")
-
-	}
-
-	log.Printf("Manager Handle: preparing: %v %v ", mtdName, tmplName)
-
-	typ, isOk := man.controllersReflected[ctrName]
-	if !isOk {
-		log.Fatalf("Manager Handle: controller [%s] not found!", ctrName)
-	}
-
-	if !reflect.New(typ).MethodByName(mtdName).IsValid() {
-		log.Fatalf("Manager Handle: method[%v] not found! (template: %v)", mtdName, tmplName)
-	}
-
-	return func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-
-		ctr := reflect.New(typ).Interface().(Controlled)
-
-		method := reflect.ValueOf(ctr).MethodByName(mtdName)
-
-		log.Printf("%T Handle: method[%v], template[%v]", ctr, mtdName, tmplName)
-
-		ctr.SetReqData(r, ps)
-
-		ctr.SetManager(man)
-
-		dbh, err := ctr.SetupDB(man.Dbc)
-
-		if err != nil {
-			log.Print(err.Error())
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		defer dbh.Close()
-
-		err = ctr.StartSession(man.sessionManager, w, r)
-		defer ctr.SessionRelease(w)
-		if err != nil {
-			log.Print(err.Error())
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		if redir {
-			ctr.SetRedir(redirAddr)
-		}
-
-		var middlewarePermission bool
-
-		if man.Config.DevSkipMiddleware && man.AppVersion == "v_dev" {
-			middlewarePermission = true
-		} else {
-			middlewarePermission = man.Mid.ctrRunBefore(ctrName, mtdName, ctr)
-		}
-
-		if middlewarePermission {
-			method.Call([]reflect.Value{})
-		}
-
-		if ctr.IsError() {
-			log.Print("Error from controller detected, serving:")
-			log.Print(ctr.GetError().Msg)
-			log.Print(ctr.GetError().Err)
-			http.Error(w, ctr.GetError().Msg, ctr.GetError().Code)
-		} else {
-			redirS, redirAddrS := ctr.GetRedir()
-			if redirS {
-				http.Redirect(w, r, redirAddrS, 303)
-			} else {
-				err := man.Views.FireTemplate(tmplName, w, ctr.Ctnt())
-				if err != nil {
-					log.Print(err.Error())
-				}
-			}
-		}
-
-	}
-}
-
-func (man *Manager) HandleDirect(params ...string) httprouter.Handle {
-
-	var ctrName, mtdName string
-
-	switch len(params) {
-	case 2:
-		ctrName = params[0]
-		mtdName = params[1]
-
-	default:
-		log.Fatal("Manager HandleDirect: wrong parameter count!")
-
-	}
-
-	log.Printf("Manager HandleDirect: preparing: %v", mtdName)
-
-	typ, isOk := man.controllersReflected[ctrName]
-	if !isOk {
-		log.Fatalf("Manager HandleDirect: controller [%s] not found!", ctrName)
-	}
-
-	if !reflect.New(typ).MethodByName(mtdName).IsValid() {
-		log.Fatalf("Manager HandleDirect: method[%v] not found!", mtdName)
-	}
-
-	return func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-
-		ctr := reflect.New(typ).Interface().(Controlled)
-
-		method := reflect.ValueOf(ctr).MethodByName(mtdName)
-
-		input := []reflect.Value{
-			reflect.ValueOf(w),
-			reflect.ValueOf(r),
-			reflect.ValueOf(ps),
-		}
-
-		log.Printf("%T HandleDirect: method[%v]", ctr, mtdName)
-
-		ctr.SetReqData(r, ps)
-
-		ctr.SetManager(man)
-
-		dbh, err := ctr.SetupDB(man.Dbc)
-
-		if err != nil {
-			log.Print(err.Error())
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		defer dbh.Close()
-
-		err = ctr.StartSession(man.sessionManager, w, r)
-		defer ctr.SessionRelease(w)
-		if err != nil {
-			log.Print(err.Error())
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		var middlewarePermission bool
-
-		if man.Config.DevSkipMiddleware && man.AppVersion == "v_dev" {
-			middlewarePermission = true
-		} else {
-			middlewarePermission = man.Mid.ctrRunBefore(ctrName, mtdName, ctr)
-		}
-
-		if middlewarePermission {
-			method.Call(input)
-		}
-
-		if ctr.IsError() {
-			log.Print("Error from controller detected, serving:")
-			log.Print(ctr.GetError().Msg)
-			log.Print(ctr.GetError().Err)
-			http.Error(w, ctr.GetError().Msg, ctr.GetError().Code)
-		}
-
-	}
 }
 
 func FileDirExists(path string) (bool, error) {
@@ -493,7 +176,7 @@ type ManagoHandlerFunc func(ctr *Controller) (err error)
 
 type Manageable interface {
 	SetRoutes(*Manager)
-	SetMiddleware(*Manager)
+	MigrateDbModel() interface{}
 }
 
 func (man *Manager) GET(path string, handle ManagoHandlerFunc, middlewares ...Middleware) {
@@ -505,11 +188,11 @@ func (man *Manager) POST(path string, handle ManagoHandlerFunc, middlewares ...M
 }
 
 func (man *Manager) AddRoute(method string, path string, handle ManagoHandlerFunc, middlewares ...Middleware) {
-	man.router.Handle(method, path, man.handleWrapper(handle, middlewares...))
+	man.router.Handle(method, path, man.handleWrapper(handle, path, middlewares...))
 }
 
-func (man *Manager) handleWrapper(handlerFunc ManagoHandlerFunc, middlewares ...Middleware) (handle httprouter.Handle) {
-	var templateName string
+func (man *Manager) handleWrapper(handlerFunc ManagoHandlerFunc, path string, middlewares ...Middleware) (handle httprouter.Handle) {
+
 	return func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 		ctr := Controller{}
 
@@ -534,17 +217,12 @@ func (man *Manager) handleWrapper(handlerFunc ManagoHandlerFunc, middlewares ...
 			return
 		}
 
-		var middlewarePermission bool
-		for _, midWare := range middlewares {
-			if midWare.RunBefore(&ctr) {
-				middlewarePermission = true
-			}
-		}
+		middlewarePermission := true
 
-		if man.Config.DevSkipMiddleware && man.AppVersion == "v_dev" {
-			middlewarePermission = true
-		} else {
-			middlewarePermission = man.Mid.ctrRunBefore(ctrName, mtdName, ctr)
+		if !man.Config.DevSkipMiddleware || man.AppVersion != "v_dev" {
+			for _, midWare := range middlewares {
+				middlewarePermission = middlewarePermission && midWare.RunBefore(&ctr)
+			}
 		}
 
 		var errFromHandler error
@@ -552,8 +230,13 @@ func (man *Manager) handleWrapper(handlerFunc ManagoHandlerFunc, middlewares ...
 			errFromHandler = handlerFunc(&ctr)
 		}
 
+		for _, midWare := range middlewares {
+			midWare.RunAfter(&ctr)
+		}
+
 		if errFromHandler != nil {
 			errCode := ctr.GetError().Code
+			log.Printf("handler returned error with code(%d): \n%v", errCode, errFromHandler)
 			if errCode == 0 {
 				errCode = 500
 			}
@@ -563,9 +246,9 @@ func (man *Manager) handleWrapper(handlerFunc ManagoHandlerFunc, middlewares ...
 			if redirS {
 				http.Redirect(w, r, redirAddrS, 303)
 			} else {
-				err := man.Views.FireTemplate(templateName, w, ctr.Ctnt())
-				if err != nil {
-					log.Print(err.Error())
+				errFromTemplate := man.FireTemplate(w, ctr.Ctnt(), path)
+				if errFromTemplate != nil {
+					log.Println(errFromTemplate.Error())
 				}
 			}
 		}

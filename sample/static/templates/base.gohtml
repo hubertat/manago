@@ -1,0 +1,38 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link href="https://unpkg.com/filepond/dist/filepond.css" rel="stylesheet">
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.8.0/css/bulma.min.css">
+    <script defer src="https://use.fontawesome.com/releases/v5.3.1/js/all.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+</head>
+
+<body>
+    
+    <section class="section" style="min-height: 600px;">
+        <div class="container">
+            
+            {{template "content" .}}
+            
+        </div>
+    </section>
+
+    <footer class="footer">
+        <div class="content">
+            <p><strong>wk.pcl</strong> wersja -</p>
+        </div>
+    </footer>
+
+    {{template "script" .}}
+    
+</body>
+
+</html>

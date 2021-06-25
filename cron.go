@@ -1,9 +1,6 @@
 package manago
 
 import (
-	"fmt"
-	"log"
-	"reflect"
 	"time"
 )
 
@@ -74,28 +71,28 @@ func (cr *Cron) CheckTime() bool {
 func (cr *Cron) RunMethod(man *Manager) error {
 	cr.lastRun = time.Now()
 
-	typ, isOk := man.controllersReflected[cr.ControllerName]
-	if !isOk {
-		return fmt.Errorf("Cron checkMethod: controller [%s] not found!", cr.ControllerName)
-	}
+	// typ, isOk := man.controllersReflected[cr.ControllerName]
+	// if !isOk {
+	// 	return fmt.Errorf("Cron checkMethod: controller [%s] not found!", cr.ControllerName)
+	// }
 
-	if !reflect.New(typ).MethodByName(cr.MethodName).IsValid() {
-		return fmt.Errorf("Cron checkMethod: method[%v] not found!", cr.MethodName)
-	}
+	// if !reflect.New(typ).MethodByName(cr.MethodName).IsValid() {
+	// 	return fmt.Errorf("Cron checkMethod: method[%v] not found!", cr.MethodName)
+	// }
 
-	ctr := reflect.New(typ).Interface().(Controlled)
+	// ctr := reflect.New(typ).Interface().(Controlled)
 
-	method := reflect.ValueOf(ctr).MethodByName(cr.MethodName)
-	ctr.SetManager(man)
-	ctr.SetEmptyReq()
-	dbh, err := ctr.SetupDB(man.Dbc)
+	// method := reflect.ValueOf(ctr).MethodByName(cr.MethodName)
+	// ctr.SetManager(man)
+	// ctr.SetEmptyReq()
+	// dbh, err := ctr.SetupDB(man.Dbc)
 
-	if err != nil {
-		return fmt.Errorf("Cron checkMethod failed to setup db: \n%v\n", err.Error())
-	}
-	defer dbh.Close()
+	// if err != nil {
+	// 	return fmt.Errorf("Cron checkMethod failed to setup db: \n%v\n", err.Error())
+	// }
+	// defer dbh.Close()
 
-	log.Printf("##Cron RunMethod passed, running %s from controller %s.\n", cr.MethodName, cr.ControllerName)
-	go method.Call([]reflect.Value{})
+	// log.Printf("##Cron RunMethod passed, running %s from controller %s.\n", cr.MethodName, cr.ControllerName)
+	// go method.Call([]reflect.Value{})
 	return nil
 }

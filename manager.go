@@ -158,7 +158,9 @@ func (man *Manager) Start() (status string) {
 			Addr:    fmt.Sprintf("%s:%d", man.Config.Server.Host, redirPort),
 			Handler: http.RedirectHandler(fmt.Sprintf("http://%s:%d", man.Config.Server.Host, man.Config.Server.Port), 301),
 		}
-		go log.Print(redirS.ListenAndServe())
+		go func() {
+			log.Print(redirS.ListenAndServe())
+		}()
 	}
 	go func() {
 		log.Print(http.ListenAndServe(fmt.Sprintf("%s:%d", man.Config.Server.Host, man.Config.Server.Port), man.router))

@@ -149,6 +149,17 @@ func (man *Manager) Start() (status string) {
 	go man.sessionManager.GC()
 
 	status = fmt.Sprintf("Manager Start http server: %s:%d\n", man.Config.Server.Host, man.Config.Server.Port)
+	if len(man.Config.Server.RedirectFromPorts) > 0 {
+		status = fmt.Sprintf("%s + redirecting from ports: %v\n", status, man.Config.Server.RedirectFromPorts)
+	}
+
+	for _, redirPort := range man.Config.Server.RedirectFromPorts {
+		redirS := &http.Server{
+			Addr:    fmt.Sprintf("%s:%d", man.Config.Server.Host, redirPort),
+			Handler: http.RedirectHandler(fmt.Sprintf("http://%s:%d", man.Config.Server.Host, man.Config.Server.Port), 301),
+		}
+		go log.Print(redirS.ListenAndServe())
+	}
 	go func() {
 		log.Print(http.ListenAndServe(fmt.Sprintf("%s:%d", man.Config.Server.Host, man.Config.Server.Port), man.router))
 	}()

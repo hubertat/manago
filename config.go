@@ -15,8 +15,9 @@ type FilePath struct {
 }
 
 type ServerConfig struct {
-	Host string
-	Port uint
+	Host              string
+	Port              uint
+	RedirectFromPorts []uint
 }
 
 type DatabaseConfig struct {

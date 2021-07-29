@@ -200,8 +200,7 @@ func uintToString(val uint) string {
 func ExtractHrefs(input string) (hrefs []string) {
 	prefixes := []string{"https://", "http://"}
 	endPosition := 0
-	delimeters := ` "';
-	`
+	delimeters := ` "';` + "\n\r\t"
 
 	for _, prefix := range prefixes {
 		description := input

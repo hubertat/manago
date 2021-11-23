@@ -47,6 +47,8 @@ type Controlled interface {
 	CallClient(string, string, url.Values, interface{}) error
 	VerifyApiKey() bool
 	QuickSendMessage(string) error
+	SetRequestStartTime(*time.Time)
+	FillExecutionTime()
 }
 
 type File interface {
@@ -521,4 +523,12 @@ func (ctr *Controller) SendMessage(msg Message) error {
 	}
 
 	return ctr.Man.Messaging.Send(msg)
+}
+
+func (ctr *Controller) SetRequestStartTime(when *time.Time) {
+	ctr.Req.startTime = when
+}
+
+func (ctr *Controller) FillExecutionTime() {
+	ctr.SetCt("_execution_time", ctr.Req.SinceRequestStart().String())
 }

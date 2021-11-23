@@ -20,6 +20,7 @@ type Request struct {
 	redir        bool
 	redirAddress string
 	params       httprouter.Params
+	startTime    *time.Time
 }
 
 func (req *Request) SetData(r *http.Request, ps httprouter.Params) {
@@ -158,4 +159,8 @@ func (req *Request) ParamIntByName(name string) int {
 		log.Print(err)
 		return 0
 	}
+}
+
+func (req *Request) SinceRequestStart() time.Duration {
+	return time.Since(*req.startTime)
 }

@@ -284,6 +284,7 @@ func (man *Manager) HandleJson(ctrName, mtdName string) httprouter.Handle {
 }
 
 func (man *Manager) Handle(params ...string) httprouter.Handle {
+	requestStarted := time.Now()
 	var redir bool
 	var ctrName, mtdName, tmplName, redirAddr string
 
@@ -339,6 +340,8 @@ func (man *Manager) Handle(params ...string) httprouter.Handle {
 
 		ctr.SetManager(man)
 
+		ctr.SetRequestStartTime(&requestStarted)
+
 		dbh, err := ctr.SetupDB(man.Dbc)
 
 		if err != nil {
@@ -380,8 +383,9 @@ func (man *Manager) Handle(params ...string) httprouter.Handle {
 		} else {
 			redirS, redirAddrS := ctr.GetRedir()
 			if redirS {
-				http.Redirect(w, r, redirAddrS, 303)
+				http.Redirect(w, r, redirAddrS, http.StatusSeeOther)
 			} else {
+				ctr.FillExecutionTime()
 				err := man.Views.FireTemplate(tmplName, w, ctr.Ctnt())
 				if err != nil {
 					log.Print(err.Error())

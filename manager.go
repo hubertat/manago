@@ -284,7 +284,6 @@ func (man *Manager) HandleJson(ctrName, mtdName string) httprouter.Handle {
 }
 
 func (man *Manager) Handle(params ...string) httprouter.Handle {
-	requestStarted := time.Now()
 	var redir bool
 	var ctrName, mtdName, tmplName, redirAddr string
 

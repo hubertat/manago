@@ -328,7 +328,7 @@ func (man *Manager) Handle(params ...string) httprouter.Handle {
 	}
 
 	return func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-
+		requestStarted := time.Now()
 		ctr := reflect.New(typ).Interface().(Controlled)
 
 		method := reflect.ValueOf(ctr).MethodByName(mtdName)
@@ -338,6 +338,8 @@ func (man *Manager) Handle(params ...string) httprouter.Handle {
 		ctr.SetReqData(r, ps)
 
 		ctr.SetManager(man)
+
+		ctr.SetRequestStartTime(&requestStarted)
 
 		dbh, err := ctr.SetupDB(man.Dbc)
 
@@ -380,8 +382,9 @@ func (man *Manager) Handle(params ...string) httprouter.Handle {
 		} else {
 			redirS, redirAddrS := ctr.GetRedir()
 			if redirS {
-				http.Redirect(w, r, redirAddrS, 303)
+				http.Redirect(w, r, redirAddrS, http.StatusSeeOther)
 			} else {
+				ctr.FillExecutionTime()
 				err := man.Views.FireTemplate(tmplName, w, ctr.Ctnt())
 				if err != nil {
 					log.Print(err.Error())

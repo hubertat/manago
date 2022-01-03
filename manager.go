@@ -237,13 +237,12 @@ func (man *Manager) HandleJson(ctrName, mtdName string) httprouter.Handle {
 		ctr.SetReqData(r, ps)
 		ctr.SetManager(man)
 
-		dbh, err := ctr.SetupDB(man.Dbc)
+		_, err := ctr.SetupDB(man.Dbc)
 		if err != nil {
 			log.Print(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		defer dbh.Close()
 
 		err = ctr.StartSession(man.sessionManager, w, r)
 		defer ctr.SessionRelease(w)
@@ -341,14 +340,13 @@ func (man *Manager) Handle(params ...string) httprouter.Handle {
 
 		ctr.SetRequestStartTime(&requestStarted)
 
-		dbh, err := ctr.SetupDB(man.Dbc)
+		_, err := ctr.SetupDB(man.Dbc)
 
 		if err != nil {
 			log.Print(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		defer dbh.Close()
 
 		err = ctr.StartSession(man.sessionManager, w, r)
 		defer ctr.SessionRelease(w)
@@ -438,14 +436,13 @@ func (man *Manager) HandleDirect(params ...string) httprouter.Handle {
 
 		ctr.SetManager(man)
 
-		dbh, err := ctr.SetupDB(man.Dbc)
+		_, err := ctr.SetupDB(man.Dbc)
 
 		if err != nil {
 			log.Print(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		defer dbh.Close()
 
 		err = ctr.StartSession(man.sessionManager, w, r)
 		defer ctr.SessionRelease(w)

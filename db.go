@@ -2,11 +2,12 @@ package manago
 
 import (
 	"fmt"
-	"github.com/jinzhu/gorm"
-	_ "github.com/jinzhu/gorm/dialects/mssql"
-	_ "github.com/jinzhu/gorm/dialects/postgres"
-	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"reflect"
+
+	"gorm.io/driver/postgres"
+	"gorm.io/driver/sqlite"
+	"gorm.io/driver/sqlserver"
+	"gorm.io/gorm"
 )
 
 type Db struct {
@@ -26,16 +27,16 @@ func (dbc *Db) Check(config DatabaseConfig) (err error) {
 func (dbc *Db) Open() (db *gorm.DB, err error) {
 	switch dbc.config.Server {
 	case "sqlite":
-		db, err = gorm.Open("sqlite3", "./sqlite/gorm.db")
+		db, err = gorm.Open(sqlite.Open("./sqlite/gorm.db"))
 
 	case "postgres":
-		db, err = gorm.Open("postgres", fmt.Sprintf("host=%s port=%d user=%s dbname=%s password=%s", dbc.config.Host, dbc.config.Port, dbc.config.User, dbc.config.Name, dbc.config.Pass))
+		dsn := fmt.Sprintf("host=%s port=%d user=%s dbname=%s password=%s", dbc.config.Host, dbc.config.Port, dbc.config.User, dbc.config.Name, dbc.config.Pass)
+		db, err = gorm.Open(postgres.Open(dsn))
 
 	case "mssql":
-		// db, err = gorm.Open("mssql", fmt.Sprintf("sqlserver://%s:%s@%s:%d?database=%s", dbc.config.User, dbc.config.Pass, dbc.config.Host, dbc.config.Port, dbc.config.Name))
-		db, err = gorm.Open("mssql", fmt.Sprintf("server=%s;user id=%s;password=%s;port=%d;database=%s", 
-			dbc.config.Host, dbc.config.User, dbc.config.Pass, dbc.config.Port, dbc.config.Name))
-
+		dsn := fmt.Sprintf("server=%s;user id=%s;password=%s;port=%d;database=%s",
+			dbc.config.Host, dbc.config.User, dbc.config.Pass, dbc.config.Port, dbc.config.Name)
+		db, err = gorm.Open(sqlserver.Open(dsn))
 	default:
 		db, err = nil, fmt.Errorf("Database type not found: %v, cant connect!", dbc.config)
 
@@ -46,17 +47,15 @@ func (dbc *Db) Open() (db *gorm.DB, err error) {
 }
 
 func (dbc *Db) Close() {
-	dbc.DB.Close()
 }
 
 func (dbc *Db) AutoMigrate(modelsReflected map[string]reflect.Type) (err error) {
 
 	db, err := dbc.Open()
-	
+
 	if err != nil {
 		return fmt.Errorf("models AutoMigrate failed: %w", err)
 	}
-	defer db.Close()
 
 	for _, v := range modelsReflected {
 		model := reflect.New(v).Interface()

@@ -88,12 +88,11 @@ func (cr *Cron) RunMethod(man *Manager) error {
 	method := reflect.ValueOf(ctr).MethodByName(cr.MethodName)
 	ctr.SetManager(man)
 	ctr.SetEmptyReq()
-	dbh, err := ctr.SetupDB(man.Dbc)
+	_, err := ctr.SetupDB(man.Dbc)
 
 	if err != nil {
 		return fmt.Errorf("Cron checkMethod failed to setup db: \n%v\n", err.Error())
 	}
-	defer dbh.Close()
 
 	log.Printf("##Cron RunMethod passed, running %s from controller %s.\n", cr.MethodName, cr.ControllerName)
 	go method.Call([]reflect.Value{})

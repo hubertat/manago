@@ -4,26 +4,26 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-	"github.com/jinzhu/gorm"
+
+	"gorm.io/gorm"
 )
 
 type Paginator struct {
-	CurrentPage		int
-	Limit			int
+	CurrentPage int
+	Limit       int
 
-	LastPage		int
-	Count			int
-	IsFirstPage		bool
-	IsLastPage		bool
+	LastPage    int
+	Count       int
+	IsFirstPage bool
+	IsLastPage  bool
 
-
-	controller			*Controller
+	controller *Controller
 }
 
 func NewPaginator(ctr *Controller) (pag *Paginator) {
 	pag = &Paginator{
-		Limit: 15,
-		controller: ctr,
+		Limit:       15,
+		controller:  ctr,
 		CurrentPage: ctr.Req.ParamIntByName("page"),
 	}
 
@@ -36,10 +36,10 @@ func (pag *Paginator) RunTransaction(modelSlice interface{}, db *gorm.DB) error 
 		return fmt.Errorf("Paginator RunTransaction: Expected pointer to modele slice! Received non-pointer type.")
 	}
 
-	count := 0
-	
+	var count int64
+
 	db.Find(modelSlice).Count(&count)
-	
+
 	err := db.Limit(pag.getLimit()).Offset(pag.getOffset()).Order("id").Find(modelSlice).Error
 	if err != nil {
 		return fmt.Errorf("Paginator RunTransaction: gorm DB.Find error:\n%v", err)
@@ -55,12 +55,11 @@ func (pag *Paginator) QueryInFields(modelSlice interface{}, query string, fields
 	tx := pag.controller.Man.Dbc.DB
 	for ix, field := range fields {
 		if ix == 0 {
-			tx = tx.Where(fmt.Sprintf("LOWER(%s) LIKE ?", field), "%" + strings.ToLower(query) + "%")	
+			tx = tx.Where(fmt.Sprintf("LOWER(%s) LIKE ?", field), "%"+strings.ToLower(query)+"%")
 		} else {
-			tx = tx.Or(fmt.Sprintf("LOWER(%s) LIKE ?", field), "%" + strings.ToLower(query) + "%")
+			tx = tx.Or(fmt.Sprintf("LOWER(%s) LIKE ?", field), "%"+strings.ToLower(query)+"%")
 		}
 	}
-	
 
 	return pag.RunTransaction(modelSlice, tx)
 }
@@ -80,16 +79,16 @@ func (pag *Paginator) HasRelation(modelSlice interface{}, relationName string) e
 	return pag.RunTransaction(modelSlice, tx)
 }
 
-func (pag *Paginator) updateCount(count int) {
-	pag.Count = count
+func (pag *Paginator) updateCount(count int64) {
+	pag.Count = int(count)
 
-	totalPages := count / pag.Limit
+	totalPages := int(count) / pag.Limit
 
-	if totalPages * pag.Limit < pag.Count {
+	if totalPages*pag.Limit < pag.Count {
 		totalPages += 1
 	}
 	pag.LastPage = totalPages - 1
-	
+
 	pag.IsFirstPage = (pag.CurrentPage == 0)
 	pag.IsLastPage = (pag.CurrentPage == pag.LastPage)
 
@@ -132,4 +131,3 @@ func (pag *Paginator) GetPrevPageNumber() int {
 
 	return pag.CurrentPage - 1
 }
-

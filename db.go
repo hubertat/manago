@@ -31,14 +31,18 @@ func (dbc *Db) Open() (db *gorm.DB, err error) {
 
 	case "postgres":
 		dsn := fmt.Sprintf("host=%s port=%d user=%s dbname=%s password=%s", dbc.config.Host, dbc.config.Port, dbc.config.User, dbc.config.Name, dbc.config.Pass)
-		db, err = gorm.Open(postgres.Open(dsn))
+		db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{
+			DisableForeignKeyConstraintWhenMigrating: true,
+		})
 
 	case "mssql":
 		dsn := fmt.Sprintf("server=%s;user id=%s;password=%s;port=%d;database=%s",
 			dbc.config.Host, dbc.config.User, dbc.config.Pass, dbc.config.Port, dbc.config.Name)
-		db, err = gorm.Open(sqlserver.Open(dsn))
+		db, err = gorm.Open(sqlserver.Open(dsn), &gorm.Config{
+			DisableForeignKeyConstraintWhenMigrating: true,
+		})
 	default:
-		db, err = nil, fmt.Errorf("Database type not found: %v, cant connect!", dbc.config)
+		db, err = nil, fmt.Errorf("database type not found: %v, cant connect!", dbc.config)
 
 	}
 

@@ -85,6 +85,7 @@ func (vs *ViewSet) walkForBase(path string, d fs.DirEntry, err error) error {
 					"isNot":        tFuncIsNot,
 					"tSimple":      tTime,
 					"tDate":        tDate,
+					"tDateTime":    tDateTime,
 					"sLimit":       tLimitString,
 					"tFindInput":   tFindInput,
 					"uintToString": uintToString,
@@ -146,6 +147,10 @@ func tTime(t time.Time) string {
 
 func tDate(t time.Time) string {
 	return t.Format("2006-01-02")
+}
+
+func tDateTime(t time.Time) string {
+	return t.Format("2006-01-02T15:04")
 }
 
 func tLimitString(s string) string {

@@ -174,6 +174,23 @@ func (man *Manager) Start() (status string) {
 	return
 }
 
+func (man *Manager) StartTls(certFile string, keyFile string) (status string) {
+
+	go man.sessionManager.GC()
+
+	status = fmt.Sprintf("Manager Start http server: %s:%d, with cert file: %s and key file: %s\n", man.Config.Server.Host, man.Config.Server.Port, certFile, keyFile)
+	go func() {
+		log.Print(http.ListenAndServeTLS(fmt.Sprintf("%s:%d", man.Config.Server.Host, man.Config.Server.Port), certFile, keyFile, man.router))
+	}()
+
+	if len(man.CronTasks) > 0 {
+		status += "Starting Cron loop."
+		go man.CronLoop()
+	}
+
+	return
+}
+
 func (man *Manager) MakeRoutes() {
 
 	man.makeStaticRoutes()

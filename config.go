@@ -28,6 +28,7 @@ type DatabaseConfig struct {
 	User       string
 	Pass       string
 	Name       string
+	DisableSsl bool
 }
 
 type AuthGroup struct {

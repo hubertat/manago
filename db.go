@@ -32,7 +32,7 @@ func (dbc *Db) Open() (db *gorm.DB, err error) {
 
 	case "postgres":
 		if dbc.config.DisableSsl {
-			db, err = gorm.Open("postgres", fmt.Sprintf("host=%s port=%d user=%s dbname=%s password=%s sslmode=disable", dbc.config.Host, dbc.config.Port, dbc.config.User, dbc.config.Name, dbc.config.Pass))
+			db, err = gorm.Open("postgres", fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable", dbc.config.User, dbc.config.Pass, dbc.config.Host, dbc.config.Port, dbc.config.Name))
 		} else {
 			db, err = gorm.Open("postgres", fmt.Sprintf("host=%s port=%d user=%s dbname=%s password=%s", dbc.config.Host, dbc.config.Port, dbc.config.User, dbc.config.Name, dbc.config.Pass))
 		}
@@ -43,7 +43,7 @@ func (dbc *Db) Open() (db *gorm.DB, err error) {
 			dbc.config.Host, dbc.config.User, dbc.config.Pass, dbc.config.Port, dbc.config.Name))
 
 	default:
-		db, err = nil, fmt.Errorf("Database type not found: %v, cant connect!", dbc.config)
+		db, err = nil, fmt.Errorf("database type not found: %v, cant connect!", dbc.config)
 
 	}
 

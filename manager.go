@@ -540,19 +540,24 @@ func (man *Manager) CopyDatabase() {
 	}
 
 	log.Println("migrating target db...")
+	start := time.Now()
 	err = targetDb.AutoMigrate(man.modelsReflected)
 	if err != nil {
 		log.Println("Failed to perform migration for target db, will not copy db:")
 		log.Println(err)
 		return
 	}
+	log.Println("finished migration in ", time.Since(start).Seconds(), " seconds.")
+
+	log.Println("copying rows...")
+	start = time.Now()
 
 	err = man.Dbc.CopyDb(man.modelsReflected, targetDb)
 	if err != nil {
 		log.Println("Received an error during copying db to target, most likely copy is not complete:")
 		log.Println(err)
 	} else {
-		log.Println("Copy db to target complete!")
+		log.Println("Copy db to target complete (took ", time.Since(start).Seconds(), " seconds).")
 	}
 
 }

@@ -12,18 +12,18 @@ type Middleware interface {
 }
 
 type MidMethodSet struct {
-	metName		string
-	middleware	Middleware
-	params		map[string]string
+	metName    string
+	middleware Middleware
+	params     map[string]string
 }
 
 type MidCtrSet struct {
-	ctrName		string
-	methods		[]MidMethodSet
+	ctrName string
+	methods []MidMethodSet
 }
 
 type MiddlewareManager struct {
-	ctrMap					map[string]*MidCtrSet
+	ctrMap map[string]*MidCtrSet
 }
 
 func NewMiddlewareManager() *MiddlewareManager {
@@ -36,7 +36,7 @@ func NewMiddlewareManager() *MiddlewareManager {
 func (mm *MiddlewareManager) ControllerSetRaw(ctrName string, middleware Middleware, params map[string]string, methods ...string) error {
 	ms := MidMethodSet{
 		middleware: middleware,
-		params: params,
+		params:     params,
 	}
 
 	return mm.ControllerSet(ctrName, &ms, methods...)
@@ -79,11 +79,11 @@ func (mm *MiddlewareManager) GetSet(middleware Middleware, params ...string) *Mi
 			ms.params[pSlice[0]] = pSlice[1]
 		} else {
 			ms.params[pSlice[0]] = ""
-		}	
-		
+		}
+
 	}
 
-	return ms 
+	return ms
 }
 
 func (mm *MiddlewareManager) ctrRunBefore(ctrName, mtdName string, ctr Controlled) (proceed bool) {

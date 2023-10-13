@@ -13,8 +13,8 @@ import (
 
 	"github.com/astaxie/beego/session"
 	"github.com/iancoleman/strcase"
-	"github.com/jinzhu/gorm"
 	"github.com/julienschmidt/httprouter"
+	"gorm.io/gorm"
 )
 
 type Controlled interface {
@@ -340,7 +340,8 @@ func (ctr *Controller) GetModel(model interface{}, preload ...string) (err error
 
 	err = tx.First(model, modelId).Error
 	if err != nil {
-		if gorm.IsRecordNotFoundError(err) {
+
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			ctr.SetError(404, err)
 			return
 		} else {
@@ -392,7 +393,7 @@ func (ctr *Controller) LookForFileponds(model interface{}, file File, params ...
 	}
 
 	var fId *FileId
-	var cnt int
+	var cnt int64
 
 	for _, onePond := range ctr.Req.FormSlice("filepond") {
 		if len(onePond) > 0 {
@@ -485,7 +486,7 @@ func (ctr *Controller) AppendAuthUser(user interface{}, model interface{}, field
 		field = "User"
 	}
 
-	return ctr.Db.Model(model).Association(field).Append(user).Error
+	return ctr.Db.Model(model).Association(field).Append(user)
 }
 
 func (ctr *Controller) GetAltDbConfig() (config *DatabaseConfig) {

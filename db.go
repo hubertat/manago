@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 
+
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/mssql"
 	_ "github.com/jinzhu/gorm/dialects/postgres"
@@ -28,7 +29,7 @@ func (dbc *Db) Check(config DatabaseConfig) (err error) {
 func (dbc *Db) Open() (db *gorm.DB, err error) {
 	switch dbc.config.Server {
 	case "sqlite":
-		db, err = gorm.Open("sqlite3", "./sqlite/gorm.db")
+		db, err = gorm.Open(sqlite.Open("./sqlite/gorm.db"))
 
 	case "postgres":
 		if dbc.config.DisableSsl {
@@ -52,7 +53,6 @@ func (dbc *Db) Open() (db *gorm.DB, err error) {
 }
 
 func (dbc *Db) Close() {
-	dbc.DB.Close()
 }
 
 func (dbc *Db) AutoMigrate(modelsReflected map[string]reflect.Type) (err error) {
@@ -62,7 +62,6 @@ func (dbc *Db) AutoMigrate(modelsReflected map[string]reflect.Type) (err error) 
 	if err != nil {
 		return fmt.Errorf("models AutoMigrate failed: %w", err)
 	}
-	defer db.Close()
 
 	for _, v := range modelsReflected {
 		model := reflect.New(v).Interface()

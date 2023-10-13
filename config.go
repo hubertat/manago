@@ -28,6 +28,7 @@ type DatabaseConfig struct {
 	User       string
 	Pass       string
 	Name       string
+	DisableSsl bool
 }
 
 type AuthGroup struct {
@@ -36,9 +37,10 @@ type AuthGroup struct {
 }
 
 type Config struct {
-	Server ServerConfig
-	Db     DatabaseConfig
-	DbAlt  *DatabaseConfig `json:"db_alt,omitempty"`
+	Server   ServerConfig
+	Db       DatabaseConfig
+	DbAlt    *DatabaseConfig `json:"db_alt,omitempty"`
+	DbTarget *DatabaseConfig `json:"db_target,omitempty"`
 
 	StoragePaths []FilePath
 	MappedPaths  map[string]*FilePath

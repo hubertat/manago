@@ -518,3 +518,43 @@ func (man *Manager) CronLoop() {
 	}
 
 }
+
+func (man *Manager) CopyDatabase() {
+	log.Println("Copy Database")
+	log.Println("will perform migration on target db and then copy all rows from source (main) db")
+
+	if man.Config.DbTarget == nil {
+		log.Println("Target db not configured, cannot continue.")
+		return
+	}
+
+	targetDb := &Db{}
+	err := targetDb.Check(*man.Config.DbTarget)
+	if err != nil {
+		log.Println("Failed to load target db config, cannot continue:")
+		log.Println(err)
+		return
+	}
+
+	log.Println("migrating target db...")
+	start := time.Now()
+	err = targetDb.AutoMigrate(man.modelsReflected)
+	if err != nil {
+		log.Println("Failed to perform migration for target db, will not copy db:")
+		log.Println(err)
+		return
+	}
+	log.Println("finished migration in ", time.Since(start).Seconds(), " seconds.")
+
+	log.Println("copying rows...")
+	start = time.Now()
+
+	err = man.Dbc.CopyDb(man.modelsReflected, targetDb)
+	if err != nil {
+		log.Println("Received an error during copying db to target, most likely copy is not complete:")
+		log.Println(err)
+	} else {
+		log.Println("Copy db to target complete (took ", time.Since(start).Seconds(), " seconds).")
+	}
+
+}

@@ -49,6 +49,7 @@ type Controlled interface {
 	QuickSendMessage(string) error
 	SetRequestStartTime(*time.Time)
 	FillExecutionTime()
+	HttpRequest() *http.Request
 }
 
 type File interface {
@@ -532,4 +533,8 @@ func (ctr *Controller) SetRequestStartTime(when *time.Time) {
 
 func (ctr *Controller) FillExecutionTime() {
 	ctr.SetCt("_execution_time", ctr.Req.SinceRequestStart().String())
+}
+
+func (ctr *Controller) HttpRequest() *http.Request {
+	return ctr.Req.R
 }

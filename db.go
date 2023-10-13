@@ -1,13 +1,15 @@
 package manago
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 
-	"gorm.io/driver/postgres"
-	"gorm.io/driver/sqlite"
-	"gorm.io/driver/sqlserver"
-	"gorm.io/gorm"
+
+	"github.com/jinzhu/gorm"
+	_ "github.com/jinzhu/gorm/dialects/mssql"
+	_ "github.com/jinzhu/gorm/dialects/postgres"
+	_ "github.com/jinzhu/gorm/dialects/sqlite"
 )
 
 type Db struct {
@@ -30,17 +32,17 @@ func (dbc *Db) Open() (db *gorm.DB, err error) {
 		db, err = gorm.Open(sqlite.Open("./sqlite/gorm.db"))
 
 	case "postgres":
-		dsn := fmt.Sprintf("host=%s port=%d user=%s dbname=%s password=%s", dbc.config.Host, dbc.config.Port, dbc.config.User, dbc.config.Name, dbc.config.Pass)
-		db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{
-			DisableForeignKeyConstraintWhenMigrating: true,
-		})
+		if dbc.config.DisableSsl {
+			db, err = gorm.Open("postgres", fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable", dbc.config.User, dbc.config.Pass, dbc.config.Host, dbc.config.Port, dbc.config.Name))
+		} else {
+			db, err = gorm.Open("postgres", fmt.Sprintf("host=%s port=%d user=%s dbname=%s password=%s", dbc.config.Host, dbc.config.Port, dbc.config.User, dbc.config.Name, dbc.config.Pass))
+		}
 
 	case "mssql":
-		dsn := fmt.Sprintf("server=%s;user id=%s;password=%s;port=%d;database=%s",
-			dbc.config.Host, dbc.config.User, dbc.config.Pass, dbc.config.Port, dbc.config.Name)
-		db, err = gorm.Open(sqlserver.Open(dsn), &gorm.Config{
-			DisableForeignKeyConstraintWhenMigrating: true,
-		})
+		// db, err = gorm.Open("mssql", fmt.Sprintf("sqlserver://%s:%s@%s:%d?database=%s", dbc.config.User, dbc.config.Pass, dbc.config.Host, dbc.config.Port, dbc.config.Name))
+		db, err = gorm.Open("mssql", fmt.Sprintf("server=%s;user id=%s;password=%s;port=%d;database=%s",
+			dbc.config.Host, dbc.config.User, dbc.config.Pass, dbc.config.Port, dbc.config.Name))
+
 	default:
 		db, err = nil, fmt.Errorf("database type not found: %v, cant connect!", dbc.config)
 
@@ -68,4 +70,44 @@ func (dbc *Db) AutoMigrate(modelsReflected map[string]reflect.Type) (err error) 
 	}
 
 	return
+}
+
+func (dbc *Db) CopyDb(modelsReflected map[string]reflect.Type, targetDb *Db) error {
+	source, err := dbc.Open()
+	if err != nil {
+		return errors.Join(errors.New("failed to open source db"), err)
+	}
+	defer source.Close()
+
+	target, err := targetDb.Open()
+	if err != nil {
+		return errors.Join(errors.New("failed to open target db"), err)
+	}
+	defer target.Close()
+
+	for _, v := range modelsReflected {
+		model := reflect.New(v).Interface()
+		rows, err := source.Model(model).Rows()
+		if err != nil {
+			return errors.Join(errors.New("failed to get rows"), err)
+		}
+
+		for rows.Next() {
+			err = source.ScanRows(rows, model)
+			if err != nil {
+				rows.Close()
+				return errors.Join(errors.New("failed to scan row"), err)
+			}
+
+			result := target.Create(model)
+			if result.Error != nil {
+				rows.Close()
+				return errors.Join(errors.New("failed to create new row in target db"), result.Error)
+			}
+		}
+
+		rows.Close()
+	}
+
+	return nil
 }

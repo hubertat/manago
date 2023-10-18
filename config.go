@@ -3,9 +3,7 @@ package manago
 import (
 	"encoding/json"
 	"fmt"
-
-	// "os"
-	"io/ioutil"
+	"os"
 
 	"github.com/hubertat/manago/logging"
 )
@@ -95,10 +93,12 @@ func (c *Config) FillDefaults() {
 	c.WebStaticPath = "web"
 
 	c.DefaultPath = "./files/"
+
+	c.Name = "Default APP name"
 }
 
 func (c *Config) ReadFile(fPath string) error {
-	cFile, err := ioutil.ReadFile(fPath)
+	cFile, err := os.ReadFile(fPath)
 	if err != nil {
 		return fmt.Errorf("config ReadFile [%v]: %w", fPath, err)
 	}

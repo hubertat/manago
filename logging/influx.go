@@ -14,12 +14,13 @@ type Influx struct {
 	api     api.WriteAPI
 }
 
-func (inf *Influx) LogExecutionTime(path string, duration time.Duration) {
+func (inf *Influx) LogExecutionTime(path string, handlerType string, duration time.Duration) {
 	p := influxdb2.NewPoint(
 		"execution_time",
 		map[string]string{
 			"app":  inf.appName,
 			"path": path,
+			"type": handlerType,
 		},
 		map[string]interface{}{"duration_ms": duration.Milliseconds()},
 		time.Now(),
@@ -27,12 +28,13 @@ func (inf *Influx) LogExecutionTime(path string, duration time.Duration) {
 	inf.api.WritePoint(p)
 }
 
-func (inf *Influx) LogError(path string, err error, errorCode int) {
+func (inf *Influx) LogError(path string, handlerType string, err error, errorCode int) {
 	p := influxdb2.NewPoint(
 		"errors",
 		map[string]string{
 			"app":  inf.appName,
 			"path": path,
+			"type": handlerType,
 			"code": fmt.Sprint(errorCode),
 		},
 		map[string]interface{}{"error": err.Error()},

@@ -65,7 +65,7 @@ func New(conf Config, allCtrs []interface{}, allModels []interface{}, build ...s
 	for _, ctr := range allCtrs {
 		typ := reflect.ValueOf(ctr).Type()
 		if typ.Kind().String() == "ptr" {
-			err = fmt.Errorf("ERROR Manager New: Found pointer in allControllers[], expecting struct.")
+			err = fmt.Errorf("found pointer in allControllers[], expecting struct")
 			return
 		}
 		name := strcase.ToSnake(typ.Name())
@@ -78,7 +78,7 @@ func New(conf Config, allCtrs []interface{}, allModels []interface{}, build ...s
 	for _, m := range allModels {
 		typ := reflect.ValueOf(m).Type()
 		if typ.Kind().String() == "ptr" {
-			err = fmt.Errorf("ERROR Manager New: Found pointer in allModels[], expecting struct.")
+			err = fmt.Errorf("found pointer in allModels[], expecting struct")
 			return
 		}
 		name := strcase.ToSnake(typ.Name())
@@ -126,7 +126,7 @@ func (man *Manager) ReloadStaticFS(fsys fs.FS) (err error) {
 	log.Println("Reloading Static FS, will reload Views and make new httprouter.")
 
 	if fsys == nil {
-		err = fmt.Errorf("Manager Reloading static FS: received nil!")
+		err = fmt.Errorf("manager reloading static FS: received nil")
 		return
 	}
 	subStatic, errSub := fs.Sub(fsys, "static")
@@ -138,7 +138,7 @@ func (man *Manager) ReloadStaticFS(fsys fs.FS) (err error) {
 
 	err = man.Views.Load(&man.Config, man)
 	if err != nil {
-		err = fmt.Errorf("Manager Reloading static FS: views set failed: %w", err)
+		err = fmt.Errorf("manager reloading static FS: views set failed: %w", err)
 		return
 	}
 
@@ -253,6 +253,7 @@ func (man *Manager) HandleJson(ctrName, mtdName string) httprouter.Handle {
 	}
 
 	return func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+		requestStarted := time.Now()
 
 		ctr := reflect.New(typ).Interface().(Controlled)
 		method := reflect.ValueOf(ctr).MethodByName(mtdName)
@@ -296,14 +297,17 @@ func (man *Manager) HandleJson(ctrName, mtdName string) httprouter.Handle {
 
 		if ctr.IsError() {
 			log.Print("Error from controller detected, serving:")
-			log.Print(ctr.GetError().Msg)
 			log.Print(ctr.GetError().Err)
+
+			man.Logger.LogError(r.URL.Path, "json", ctr.GetError().Err, ctr.GetError().Code)
+
 			http.Error(w, ctr.GetError().Msg, ctr.GetError().Code)
 		} else {
 			w.Header().Set("Content-Type", "application/json")
 			w.Write(json)
 		}
 
+		man.Logger.LogExecutionTime(r.URL.Path, "json", time.Since(requestStarted))
 	}
 }
 
@@ -399,9 +403,10 @@ func (man *Manager) Handle(params ...string) httprouter.Handle {
 
 		if ctr.IsError() {
 			log.Print("Error from controller detected, serving:")
-			log.Print(ctr.GetError().Msg)
 			log.Print(ctr.GetError().Err)
-			man.Logger.LogError(r.URL.Path, ctr.GetError().Err, ctr.GetError().Code)
+
+			man.Logger.LogError(r.URL.Path, "handler", ctr.GetError().Err, ctr.GetError().Code)
+
 			http.Error(w, ctr.GetError().Msg, ctr.GetError().Code)
 		} else {
 			redirS, redirAddrS := ctr.GetRedir()
@@ -416,7 +421,7 @@ func (man *Manager) Handle(params ...string) httprouter.Handle {
 			}
 		}
 
-		man.Logger.LogExecutionTime(r.URL.Path, time.Since(requestStarted))
+		man.Logger.LogExecutionTime(r.URL.Path, "handler", time.Since(requestStarted))
 
 	}
 }
@@ -447,6 +452,7 @@ func (man *Manager) HandleDirect(params ...string) httprouter.Handle {
 	}
 
 	return func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+		requestStarted := time.Now()
 
 		ctr := reflect.New(typ).Interface().(Controlled)
 
@@ -494,11 +500,14 @@ func (man *Manager) HandleDirect(params ...string) httprouter.Handle {
 
 		if ctr.IsError() {
 			log.Print("Error from controller detected, serving:")
-			log.Print(ctr.GetError().Msg)
 			log.Print(ctr.GetError().Err)
+
+			man.Logger.LogError(r.URL.Path, "direct", ctr.GetError().Err, ctr.GetError().Code)
+
 			http.Error(w, ctr.GetError().Msg, ctr.GetError().Code)
 		}
 
+		man.Logger.LogExecutionTime(r.URL.Path, "direct", time.Since(requestStarted))
 	}
 }
 

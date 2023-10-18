@@ -39,7 +39,7 @@ type Manager struct {
 	AppBuild   string
 }
 
-func New(appName string, conf Config, allCtrs []interface{}, allModels []interface{}, build ...string) (man *Manager, err error) {
+func New(conf Config, allCtrs []interface{}, allModels []interface{}, build ...string) (man *Manager, err error) {
 	man = &Manager{
 		Config:     conf,
 		router:     httprouter.New(),
@@ -113,7 +113,7 @@ func New(appName string, conf Config, allCtrs []interface{}, allModels []interfa
 	man.Logger = &logging.NilLogger{}
 
 	if strings.EqualFold(conf.Logging.Type, "influx") {
-		man.Logger, err = logging.NewInflux(appName, conf.Logging)
+		man.Logger, err = logging.NewInflux(conf.Name, conf.Logging)
 		if err != nil {
 			return
 		}

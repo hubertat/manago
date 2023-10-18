@@ -21,7 +21,7 @@ func (inf *Influx) LogExecutionTime(path string, duration time.Duration) {
 			"app":  inf.appName,
 			"path": path,
 		},
-		map[string]interface{}{"duration": duration},
+		map[string]interface{}{"duration_ms": duration.Milliseconds()},
 		time.Now(),
 	)
 	inf.api.WritePoint(p)

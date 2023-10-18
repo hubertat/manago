@@ -39,6 +39,8 @@ type AuthGroup struct {
 }
 
 type Config struct {
+	Name string
+
 	Server   ServerConfig
 	Db       DatabaseConfig
 	DbAlt    *DatabaseConfig `json:"db_alt,omitempty"`

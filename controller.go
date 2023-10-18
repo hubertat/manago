@@ -1,6 +1,7 @@
 package manago
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,10 +12,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/astaxie/beego/session"
+	"github.com/alexedwards/scs/v2"
 	"github.com/iancoleman/strcase"
+	"github.com/jinzhu/gorm"
 	"github.com/julienschmidt/httprouter"
-	"gorm.io/gorm"
 )
 
 type Controlled interface {
@@ -26,7 +27,7 @@ type Controlled interface {
 	SetMiddlewareParams(Middleware, map[string]string, ...string) error
 	Handle(...string) httprouter.Handle
 	SetupDB(*Db) (*gorm.DB, error)
-	StartSession(*session.Manager, http.ResponseWriter, *http.Request) error
+	StartSession(*scs.SessionManager, http.ResponseWriter, *http.Request) error
 	SessionRelease(http.ResponseWriter)
 	IsError() bool
 	GetError() StatusError
@@ -78,11 +79,10 @@ type Controller struct {
 	Router *httprouter.Router
 
 	// session specific data
-	Session session.Store
-	Auth    Auth
-	Req     Request
-	Db      *gorm.DB
-	E       StatusError
+	Auth Auth
+	Req  Request
+	Db   *gorm.DB
+	E    StatusError
 
 	Man *Manager
 }
@@ -174,28 +174,18 @@ func (ctr *Controller) SetRouter(r *httprouter.Router) {
 	ctr.Router = r
 }
 
-func (ctr *Controller) StartSession(s *session.Manager, w http.ResponseWriter, r *http.Request) error {
-	var err error
-	ctr.Session, err = s.SessionStart(w, r)
-	if err != nil {
-		return err
-	}
-	auth := ctr.Session.Get("auth")
-	switch auth := auth.(type) {
-	default:
-		ctr.Auth = Auth{}
+func (ctr *Controller) StartSession(s *scs.SessionManager, w http.ResponseWriter, r *http.Request) error {
+	ctx := context.Background()
 
-	case string:
+	auth := s.GetString(ctx, "auth")
+	if len(auth) > 0 {
 		ctr.Auth.IsIn = true
 		ctr.Auth.Guid = auth
-
+	} else {
+		ctr.Auth = Auth{}
 	}
 
-	username := ctr.Session.Get("username")
-	switch username := username.(type) {
-	case string:
-		ctr.Auth.Username = username
-	}
+	ctr.Auth.Username = s.GetString(ctx, "username")
 
 	ctr.Req.SetCtQuick(ctr.Auth)
 	ctr.Req.SetCt("AppVersion", ctr.Man.AppVersion)
@@ -204,7 +194,7 @@ func (ctr *Controller) StartSession(s *session.Manager, w http.ResponseWriter, r
 }
 
 func (ctr *Controller) SessionRelease(w http.ResponseWriter) {
-	ctr.Session.SessionRelease(w)
+
 }
 
 func (ctr *Controller) IsError() bool {
@@ -486,7 +476,7 @@ func (ctr *Controller) AppendAuthUser(user interface{}, model interface{}, field
 		field = "User"
 	}
 
-	return ctr.Db.Model(model).Association(field).Append(user)
+	return ctr.Db.Model(model).Association(field).Append(user).Error
 }
 
 func (ctr *Controller) GetAltDbConfig() (config *DatabaseConfig) {

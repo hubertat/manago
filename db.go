@@ -5,11 +5,9 @@ import (
 	"fmt"
 	"reflect"
 
-
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/mssql"
 	_ "github.com/jinzhu/gorm/dialects/postgres"
-	_ "github.com/jinzhu/gorm/dialects/sqlite"
 )
 
 type Db struct {
@@ -28,9 +26,6 @@ func (dbc *Db) Check(config DatabaseConfig) (err error) {
 
 func (dbc *Db) Open() (db *gorm.DB, err error) {
 	switch dbc.config.Server {
-	case "sqlite":
-		db, err = gorm.Open(sqlite.Open("./sqlite/gorm.db"))
-
 	case "postgres":
 		if dbc.config.DisableSsl {
 			db, err = gorm.Open("postgres", fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable", dbc.config.User, dbc.config.Pass, dbc.config.Host, dbc.config.Port, dbc.config.Name))
@@ -44,7 +39,7 @@ func (dbc *Db) Open() (db *gorm.DB, err error) {
 			dbc.config.Host, dbc.config.User, dbc.config.Pass, dbc.config.Port, dbc.config.Name))
 
 	default:
-		db, err = nil, fmt.Errorf("database type not found: %v, cant connect!", dbc.config)
+		db, err = nil, fmt.Errorf("database type not found: %v, cant connect", dbc.config)
 
 	}
 

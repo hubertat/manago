@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"strings"
 
-	"gorm.io/gorm"
+	"github.com/jinzhu/gorm"
 )
 
 type Paginator struct {

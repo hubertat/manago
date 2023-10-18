@@ -10,13 +10,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/astaxie/beego/session"
+	"github.com/alexedwards/scs/v2"
 	"github.com/iancoleman/strcase"
 	"github.com/julienschmidt/httprouter"
 )
 
+const defaultSessionLifetime = 24 * time.Hour
+
 type Manager struct {
-	sessionManager *session.Manager
+	sessionManager *scs.SessionManager
 	router         *httprouter.Router
 
 	controllersReflected map[string]reflect.Type
@@ -81,15 +83,10 @@ func New(conf Config, allCtrs []interface{}, allModels []interface{}, build ...s
 		man.modelsReflected[name] = typ
 	}
 
-	sessConfig := &session.ManagerConfig{}
-	sessConfig.EnableSetCookie = true
-	sessConfig.CookieName = "gosessionid"
-	sessConfig.Gclifetime = 10000
-
-	man.sessionManager, err = session.NewManager("memory", sessConfig)
-	if err != nil {
-		err = fmt.Errorf("ERROR Manager New: session config failed: %w", err)
-		return
+	man.sessionManager = scs.New()
+	man.sessionManager.Lifetime = defaultSessionLifetime
+	if conf.SessionLifetimeHours > 0 {
+		man.sessionManager.Lifetime = time.Duration(conf.SessionLifetimeHours) * time.Hour
 	}
 
 	man.Mid = NewMiddlewareManager()
@@ -146,8 +143,6 @@ func (man *Manager) Migrate() error {
 
 func (man *Manager) Start() (status string) {
 
-	go man.sessionManager.GC()
-
 	status = fmt.Sprintf("Manager Start http server: %s:%d\n", man.Config.Server.Host, man.Config.Server.Port)
 	if len(man.Config.Server.RedirectFromPorts) > 0 {
 		status = fmt.Sprintf("%s + redirecting from ports: %v\n", status, man.Config.Server.RedirectFromPorts)
@@ -163,7 +158,8 @@ func (man *Manager) Start() (status string) {
 		}()
 	}
 	go func() {
-		log.Print(http.ListenAndServe(fmt.Sprintf("%s:%d", man.Config.Server.Host, man.Config.Server.Port), man.router))
+		router := man.sessionManager.LoadAndSave(man.router)
+		log.Print(http.ListenAndServe(fmt.Sprintf("%s:%d", man.Config.Server.Host, man.Config.Server.Port), router))
 	}()
 
 	if len(man.CronTasks) > 0 {
@@ -176,11 +172,11 @@ func (man *Manager) Start() (status string) {
 
 func (man *Manager) StartTls(certFile string, keyFile string) (status string) {
 
-	go man.sessionManager.GC()
+	router := man.sessionManager.LoadAndSave(man.router)
 
 	status = fmt.Sprintf("Manager Start http server: %s:%d, with cert file: %s and key file: %s\n", man.Config.Server.Host, man.Config.Server.Port, certFile, keyFile)
 	go func() {
-		log.Print(http.ListenAndServeTLS(fmt.Sprintf("%s:%d", man.Config.Server.Host, man.Config.Server.Port), certFile, keyFile, man.router))
+		log.Print(http.ListenAndServeTLS(fmt.Sprintf("%s:%d", man.Config.Server.Host, man.Config.Server.Port), certFile, keyFile, router))
 	}()
 
 	if len(man.CronTasks) > 0 {
@@ -202,6 +198,7 @@ func (man *Manager) MakeRoutes() {
 		ctr.SetRouter(man.router)
 		ctr.SetRoutes()
 	}
+
 }
 
 func (man *Manager) makeStaticRoutes() error {

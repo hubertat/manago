@@ -63,6 +63,8 @@ type Config struct {
 	SlackHook *string `json:",omitempty"`
 
 	AppVariables map[string]string
+
+	SessionLifetimeHours uint `json:"session_lifetime_hours,omitempty"`
 }
 
 func (c *Config) Load(input string) (err error) {

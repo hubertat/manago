@@ -1,7 +1,6 @@
 package manago
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -29,6 +28,8 @@ type Controlled interface {
 	SetupDB(*Db) (*gorm.DB, error)
 	StartSession(*scs.SessionManager, http.ResponseWriter, *http.Request) error
 	SessionRelease(http.ResponseWriter)
+	SessionClear()
+	SessionSet(string, string)
 	IsError() bool
 	GetError() StatusError
 	SetError(int, error, ...string)
@@ -175,9 +176,8 @@ func (ctr *Controller) SetRouter(r *httprouter.Router) {
 }
 
 func (ctr *Controller) StartSession(s *scs.SessionManager, w http.ResponseWriter, r *http.Request) error {
-	ctx := context.Background()
 
-	auth := s.GetString(ctx, "auth")
+	auth := s.GetString(r.Context(), "auth")
 	if len(auth) > 0 {
 		ctr.Auth.IsIn = true
 		ctr.Auth.Guid = auth
@@ -185,7 +185,7 @@ func (ctr *Controller) StartSession(s *scs.SessionManager, w http.ResponseWriter
 		ctr.Auth = Auth{}
 	}
 
-	ctr.Auth.Username = s.GetString(ctx, "username")
+	ctr.Auth.Username = s.GetString(r.Context(), "username")
 
 	ctr.Req.SetCtQuick(ctr.Auth)
 	ctr.Req.SetCt("AppVersion", ctr.Man.AppVersion)
@@ -195,6 +195,14 @@ func (ctr *Controller) StartSession(s *scs.SessionManager, w http.ResponseWriter
 
 func (ctr *Controller) SessionRelease(w http.ResponseWriter) {
 
+}
+
+func (ctr *Controller) SessionClear() {
+	ctr.Man.sessionManager.Clear(ctr.Req.R.Context())
+}
+
+func (ctr *Controller) SessionSet(key, value string) {
+	ctr.Man.sessionManager.Put(ctr.Req.R.Context(), key, value)
 }
 
 func (ctr *Controller) IsError() bool {

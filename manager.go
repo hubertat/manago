@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/alexedwards/scs/v2"
+	"github.com/hubertat/manago/logging"
 	"github.com/iancoleman/strcase"
 	"github.com/julienschmidt/httprouter"
 )
@@ -32,12 +33,13 @@ type Manager struct {
 	StaticFsys fs.FS
 	Messaging  Messenger
 	CronTasks  []Cron
+	Logger     logging.Logger
 
 	AppVersion string
 	AppBuild   string
 }
 
-func New(conf Config, allCtrs []interface{}, allModels []interface{}, build ...string) (man *Manager, err error) {
+func New(appName string, conf Config, allCtrs []interface{}, allModels []interface{}, build ...string) (man *Manager, err error) {
 	man = &Manager{
 		Config:     conf,
 		router:     httprouter.New(),
@@ -106,6 +108,15 @@ func New(conf Config, allCtrs []interface{}, allModels []interface{}, build ...s
 
 	if conf.SlackHook != nil {
 		man.Messaging = &Slack{HookUrl: *conf.SlackHook}
+	}
+
+	man.Logger = &logging.NilLogger{}
+
+	if strings.EqualFold(conf.Logging.Type, "influx") {
+		man.Logger, err = logging.NewInflux(appName, conf.Logging)
+		if err != nil {
+			return
+		}
 	}
 
 	return
@@ -390,6 +401,7 @@ func (man *Manager) Handle(params ...string) httprouter.Handle {
 			log.Print("Error from controller detected, serving:")
 			log.Print(ctr.GetError().Msg)
 			log.Print(ctr.GetError().Err)
+			man.Logger.LogError(r.URL.Path, ctr.GetError().Err, ctr.GetError().Code)
 			http.Error(w, ctr.GetError().Msg, ctr.GetError().Code)
 		} else {
 			redirS, redirAddrS := ctr.GetRedir()
@@ -403,6 +415,8 @@ func (man *Manager) Handle(params ...string) httprouter.Handle {
 				}
 			}
 		}
+
+		man.Logger.LogExecutionTime(r.URL.Path, time.Since(requestStarted))
 
 	}
 }

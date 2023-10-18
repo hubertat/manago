@@ -6,6 +6,8 @@ import (
 
 	// "os"
 	"io/ioutil"
+
+	"github.com/hubertat/manago/logging"
 )
 
 type FilePath struct {
@@ -41,6 +43,8 @@ type Config struct {
 	Db       DatabaseConfig
 	DbAlt    *DatabaseConfig `json:"db_alt,omitempty"`
 	DbTarget *DatabaseConfig `json:"db_target,omitempty"`
+
+	Logging logging.Config
 
 	StoragePaths []FilePath
 	MappedPaths  map[string]*FilePath

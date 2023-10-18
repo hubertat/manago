@@ -30,6 +30,7 @@ type Controlled interface {
 	SessionRelease(http.ResponseWriter)
 	SessionClear()
 	SessionSet(string, string)
+	SessionGet(string) string
 	IsError() bool
 	GetError() StatusError
 	SetError(int, error, ...string)
@@ -203,6 +204,10 @@ func (ctr *Controller) SessionClear() {
 
 func (ctr *Controller) SessionSet(key, value string) {
 	ctr.Man.sessionManager.Put(ctr.Req.R.Context(), key, value)
+}
+
+func (ctr *Controller) SessionGet(key string) string {
+	return ctr.Man.sessionManager.GetString(ctr.Req.R.Context(), key)
 }
 
 func (ctr *Controller) IsError() bool {

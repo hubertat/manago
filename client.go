@@ -1,20 +1,19 @@
 package manago
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
 	"time"
-	"encoding/json"
 )
 
 type Client struct {
-
-	Url			string
-	ApiKey		string
+	Url    string
+	ApiKey string
 }
 
-func (cl *Client) Call(path string, params url.Values, result interface{}) (error) {
+func (cl *Client) Call(path string, params url.Values, result interface{}) error {
 	params.Add("api_key", cl.ApiKey)
 
 	netClient := &http.Client{
@@ -25,16 +24,17 @@ func (cl *Client) Call(path string, params url.Values, result interface{}) (erro
 	if err != nil {
 		return err
 	}
-	
+
 	relUrl, err := absUrl.Parse(path)
 	if err != nil {
 		return err
 	}
-	
+
 	resp, err := netClient.PostForm(relUrl.String(), params)
 	if err != nil {
 		return err
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode > 203 {
 		return fmt.Errorf("Client Call failed, non success status received: \n%v", resp.Status)

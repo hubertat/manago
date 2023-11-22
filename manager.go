@@ -17,6 +17,7 @@ import (
 )
 
 const defaultSessionLifetime = 24 * time.Hour
+const httpServerTimeout = 15 * time.Second
 
 type Manager struct {
 	sessionManager *scs.SessionManager
@@ -161,8 +162,10 @@ func (man *Manager) Start() (status string) {
 
 	for _, redirPort := range man.Config.Server.RedirectFromPorts {
 		redirS := &http.Server{
-			Addr:    fmt.Sprintf("%s:%d", man.Config.Server.Host, redirPort),
-			Handler: http.RedirectHandler(fmt.Sprintf("http://%s:%d", man.Config.Server.Host, man.Config.Server.Port), 301),
+			Addr:         fmt.Sprintf("%s:%d", man.Config.Server.Host, redirPort),
+			Handler:      http.RedirectHandler(fmt.Sprintf("http://%s:%d", man.Config.Server.Host, man.Config.Server.Port), 301),
+			ReadTimeout:  httpServerTimeout,
+			WriteTimeout: 2 * httpServerTimeout,
 		}
 		go func() {
 			log.Print(redirS.ListenAndServe())
@@ -170,7 +173,13 @@ func (man *Manager) Start() (status string) {
 	}
 	go func() {
 		router := man.sessionManager.LoadAndSave(man.router)
-		log.Print(http.ListenAndServe(fmt.Sprintf("%s:%d", man.Config.Server.Host, man.Config.Server.Port), router))
+		srv := &http.Server{
+			Addr:         fmt.Sprintf("%s:%d", man.Config.Server.Host, man.Config.Server.Port),
+			Handler:      router,
+			ReadTimeout:  httpServerTimeout,
+			WriteTimeout: 2 * httpServerTimeout,
+		}
+		log.Print(srv.ListenAndServe())
 	}()
 
 	if len(man.CronTasks) > 0 {
@@ -187,7 +196,13 @@ func (man *Manager) StartTls(certFile string, keyFile string) (status string) {
 
 	status = fmt.Sprintf("Manager Start http server: %s:%d, with cert file: %s and key file: %s\n", man.Config.Server.Host, man.Config.Server.Port, certFile, keyFile)
 	go func() {
-		log.Print(http.ListenAndServeTLS(fmt.Sprintf("%s:%d", man.Config.Server.Host, man.Config.Server.Port), certFile, keyFile, router))
+		srv := &http.Server{
+			Addr:         fmt.Sprintf("%s:%d", man.Config.Server.Host, man.Config.Server.Port),
+			Handler:      router,
+			ReadTimeout:  httpServerTimeout,
+			WriteTimeout: 2 * httpServerTimeout,
+		}
+		log.Print(srv.ListenAndServeTLS(certFile, keyFile))
 	}()
 
 	if len(man.CronTasks) > 0 {

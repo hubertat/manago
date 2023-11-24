@@ -278,12 +278,13 @@ func (man *Manager) HandleJson(ctrName, mtdName string) httprouter.Handle {
 		ctr.SetReqData(r, ps)
 		ctr.SetManager(man)
 
-		_, err := ctr.SetupDB(man.Dbc)
+		db, err := ctr.SetupDB(man.Dbc)
 		if err != nil {
 			log.Print(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		defer db.Close()
 
 		err = ctr.StartSession(man.sessionManager, w, r)
 		defer ctr.SessionRelease(w)
@@ -384,13 +385,14 @@ func (man *Manager) Handle(params ...string) httprouter.Handle {
 
 		ctr.SetRequestStartTime(&requestStarted)
 
-		_, err := ctr.SetupDB(man.Dbc)
+		db, err := ctr.SetupDB(man.Dbc)
 
 		if err != nil {
 			log.Print(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		defer db.Close()
 
 		err = ctr.StartSession(man.sessionManager, w, r)
 		defer ctr.SessionRelease(w)
@@ -485,13 +487,14 @@ func (man *Manager) HandleDirect(params ...string) httprouter.Handle {
 
 		ctr.SetManager(man)
 
-		_, err := ctr.SetupDB(man.Dbc)
+		db, err := ctr.SetupDB(man.Dbc)
 
 		if err != nil {
 			log.Print(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		defer db.Close()
 
 		err = ctr.StartSession(man.sessionManager, w, r)
 		defer ctr.SessionRelease(w)

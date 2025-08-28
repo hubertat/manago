@@ -35,8 +35,13 @@ func (dbc *Db) Open() (db *gorm.DB, err error) {
 
 	case "mssql":
 		// db, err = gorm.Open("mssql", fmt.Sprintf("sqlserver://%s:%s@%s:%d?database=%s", dbc.config.User, dbc.config.Pass, dbc.config.Host, dbc.config.Port, dbc.config.Name))
-		db, err = gorm.Open("mssql", fmt.Sprintf("server=%s;user id=%s;password=%s;port=%d;database=%s",
-			dbc.config.Host, dbc.config.User, dbc.config.Pass, dbc.config.Port, dbc.config.Name))
+
+		dsn := fmt.Sprintf("server=%s;user id=%s;password=%s;port=%d;database=%s",
+			dbc.config.Host, dbc.config.User, dbc.config.Pass, dbc.config.Port, dbc.config.Name)
+		if dbc.config.DisableSsl {
+			dsn += ";encrypt=disable"
+		}
+		db, err = gorm.Open("mssql", dsn)
 
 	default:
 		db, err = nil, fmt.Errorf("database type not found: %v, cant connect", dbc.config)
